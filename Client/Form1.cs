@@ -1,10 +1,10 @@
+using SharedCore;
 using System;
 using System.IO;
 using System.Net.Sockets;
-using System.Text.Json; // Dùng để chuyển DTO thành chuỗi JSON
+using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using SharedCore;
 
 namespace Client
 {
@@ -13,6 +13,7 @@ namespace Client
         private TcpClient _client;
         private StreamWriter _writer;
         private StreamReader _reader;
+        private CryptoService _crypto; // Bộ xử lý mã hóa của Client
 
         public Form1()
         {
@@ -32,7 +33,6 @@ namespace Client
                 btnConnect.Enabled = false;
                 Log("Đang kết nối đến Server...");
 
-                // Kết nối tới IP cục bộ (localhost) ở cổng 8888
                 _client = new TcpClient();
                 await _client.ConnectAsync("127.0.0.1", 8888);
 
@@ -42,26 +42,22 @@ namespace Client
 
                 Log("Kết nối mạng thành công! Đang gửi thông tin chứng thực...");
 
-                // 1. Tạo LoginDTO chứa thông tin
                 var loginData = new LoginDTO
                 {
                     Username = txtUsername.Text,
-                    Password = "123" // Tạm thời hardcode pass, sau này có thể thêm ô nhập Pass
+                    Password = "123"
                 };
 
-                // 2. Đóng gói vào Packet
                 var packet = new Packet
                 {
                     Type = PacketType.Login,
                     Sender = txtUsername.Text,
-                    Content = JsonSerializer.Serialize(loginData) // Biến DTO thành JSON
+                    Content = JsonSerializer.Serialize(loginData)
                 };
 
-                // 3. Gửi Packet (cũng dạng JSON) qua Server
                 string jsonPacket = JsonSerializer.Serialize(packet);
                 await _writer.WriteLineAsync(jsonPacket);
 
-                // Mở một luồng chạy ngầm để liên tục lắng nghe phản hồi từ Server
                 _ = Task.Run(() => ListenToServer());
             }
             catch (Exception ex)
@@ -77,17 +73,43 @@ namespace Client
             {
                 while (true)
                 {
-                    // Chờ đọc tin nhắn từ Server
-                    string responseLine = await _reader.ReadLineAsync();
-                    if (responseLine == null) break; // Server ngắt kết nối
+                    string responseData = await _reader.ReadLineAsync();
+                    if (responseData == null) break;
 
-                    Log($"Server nói: {responseLine}");
+                    try
+                    {
+                        Packet receivedPacket = JsonSerializer.Deserialize<Packet>(responseData);
+
+                        // Xử lý khi Server gửi Public Key xuống
+                        if (receivedPacket.Type == PacketType.KeyExchange)
+                        {
+                            Log("Đang thiết lập khóa bảo mật Diffie-Hellman với Server...");
+
+                            // 1. Tạo bộ mã hóa riêng của Client
+                            _crypto = new CryptoService();
+
+                            // 2. Lấy Public Key của Server để sinh ra Chìa khóa bí mật chung
+                            _crypto.DeriveSharedSecret(receivedPacket.Payload);
+
+                            // 3. Gửi Public Key của mình lại cho Server
+                            var keyPacket = new Packet
+                            {
+                                Type = PacketType.KeyExchange,
+                                Sender = txtUsername.Text,
+                                Payload = _crypto.PublicKey
+                            };
+                            await _writer.WriteLineAsync(JsonSerializer.Serialize(keyPacket));
+
+                            Log("Thiết lập bảo mật thành công! Kênh truyền đã được mã hóa.");
+                        }
+                    }
+                    catch
+                    {
+                        Log($"Server: {responseData}");
+                    }
                 }
             }
-            catch
-            {
-                Log("Đã mất kết nối với Server.");
-            }
+            catch { Log("Đã mất kết nối với Server."); }
         }
 
         private void Log(string message)
@@ -102,14 +124,8 @@ namespace Client
             }
         }
 
-        private void rtbClientLogs_TextChanged(object sender, EventArgs e)
-        {
-
-        }
-
-        private void txtUsername_TextChanged(object sender, EventArgs e)
-        {
-
-        }
+        // Tui giữ lại 2 hàm trống này để giao diện (Design) của bạn không bị báo lỗi thiếu hàm nhé
+        private void rtbClientLogs_TextChanged(object sender, EventArgs e) { }
+        private void txtUsername_TextChanged(object sender, EventArgs e) { }
     }
 }
