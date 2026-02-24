@@ -31,19 +31,21 @@
             txtUsername = new TextBox();
             btnConnect = new Button();
             rtbClientLogs = new RichTextBox();
+            txtMessage = new TextBox();
+            btnSend = new Button();
             SuspendLayout();
             // 
             // txtUsername
             // 
-            txtUsername.Location = new Point(54, 61);
+            txtUsername.Location = new Point(63, 12);
             txtUsername.Name = "txtUsername";
-            txtUsername.Size = new Size(188, 27);
+            txtUsername.Size = new Size(237, 27);
             txtUsername.TabIndex = 0;
             txtUsername.TextChanged += txtUsername_TextChanged;
             // 
             // btnConnect
             // 
-            btnConnect.Location = new Point(54, 270);
+            btnConnect.Location = new Point(54, 364);
             btnConnect.Name = "btnConnect";
             btnConnect.Size = new Size(181, 74);
             btnConnect.TabIndex = 1;
@@ -53,19 +55,38 @@
             // 
             // rtbClientLogs
             // 
-            rtbClientLogs.Location = new Point(54, 114);
+            rtbClientLogs.Location = new Point(63, 65);
             rtbClientLogs.Name = "rtbClientLogs";
             rtbClientLogs.ReadOnly = true;
-            rtbClientLogs.Size = new Size(255, 150);
+            rtbClientLogs.Size = new Size(342, 208);
             rtbClientLogs.TabIndex = 2;
             rtbClientLogs.Text = "";
             rtbClientLogs.TextChanged += rtbClientLogs_TextChanged;
+            // 
+            // txtMessage
+            // 
+            txtMessage.Location = new Point(138, 300);
+            txtMessage.Name = "txtMessage";
+            txtMessage.Size = new Size(199, 27);
+            txtMessage.TabIndex = 3;
+            // 
+            // btnSend
+            // 
+            btnSend.Location = new Point(302, 364);
+            btnSend.Name = "btnSend";
+            btnSend.Size = new Size(130, 62);
+            btnSend.TabIndex = 4;
+            btnSend.Text = "Gửi";
+            btnSend.UseVisualStyleBackColor = true;
+            btnSend.Click += btnSend_Click;
             // 
             // Form1
             // 
             AutoScaleDimensions = new SizeF(8F, 20F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(800, 450);
+            Controls.Add(btnSend);
+            Controls.Add(txtMessage);
             Controls.Add(rtbClientLogs);
             Controls.Add(btnConnect);
             Controls.Add(txtUsername);
@@ -80,5 +101,7 @@
         private TextBox txtUsername;
         private Button btnConnect;
         private RichTextBox rtbClientLogs;
+        private TextBox txtMessage;
+        private Button btnSend;
     }
 }

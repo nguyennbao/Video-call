@@ -30,11 +30,13 @@
         {
             btnStart = new Button();
             rtbLogs = new RichTextBox();
+            btnSend = new Button();
+            txtMessage = new TextBox();
             SuspendLayout();
             // 
             // btnStart
             // 
-            btnStart.Location = new Point(90, 270);
+            btnStart.Location = new Point(95, 312);
             btnStart.Name = "btnStart";
             btnStart.Size = new Size(230, 68);
             btnStart.TabIndex = 0;
@@ -44,28 +46,50 @@
             // 
             // rtbLogs
             // 
-            rtbLogs.Location = new Point(31, 25);
+            rtbLogs.Location = new Point(120, 25);
             rtbLogs.Name = "rtbLogs";
             rtbLogs.ReadOnly = true;
-            rtbLogs.Size = new Size(333, 162);
+            rtbLogs.Size = new Size(445, 204);
             rtbLogs.TabIndex = 1;
             rtbLogs.Text = "";
+            // 
+            // btnSend
+            // 
+            btnSend.Location = new Point(409, 312);
+            btnSend.Name = "btnSend";
+            btnSend.Size = new Size(181, 68);
+            btnSend.TabIndex = 2;
+            btnSend.Text = "Gửi";
+            btnSend.UseVisualStyleBackColor = true;
+            btnSend.Click += btnSend_Click;
+            // 
+            // txtMessage
+            // 
+            txtMessage.Location = new Point(245, 253);
+            txtMessage.Name = "txtMessage";
+            txtMessage.Size = new Size(211, 27);
+            txtMessage.TabIndex = 3;
             // 
             // Form1
             // 
             AutoScaleDimensions = new SizeF(8F, 20F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(800, 450);
+            Controls.Add(txtMessage);
+            Controls.Add(btnSend);
             Controls.Add(rtbLogs);
             Controls.Add(btnStart);
             Name = "Form1";
             Text = "Form1";
             ResumeLayout(false);
+            PerformLayout();
         }
 
         #endregion
 
         private Button btnStart;
         private RichTextBox rtbLogs;
+        private Button btnSend;
+        private TextBox txtMessage;
     }
 }

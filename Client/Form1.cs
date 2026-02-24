@@ -13,7 +13,7 @@ namespace Client
         private TcpClient _client;
         private StreamWriter _writer;
         private StreamReader _reader;
-        private CryptoService _crypto; // Bộ xử lý mã hóa của Client
+        private CryptoService _crypto;
 
         public Form1()
         {
@@ -42,12 +42,7 @@ namespace Client
 
                 Log("Kết nối mạng thành công! Đang gửi thông tin chứng thực...");
 
-                var loginData = new LoginDTO
-                {
-                    Username = txtUsername.Text,
-                    Password = "123"
-                };
-
+                var loginData = new LoginDTO { Username = txtUsername.Text, Password = "123" };
                 var packet = new Packet
                 {
                     Type = PacketType.Login,
@@ -55,8 +50,7 @@ namespace Client
                     Content = JsonSerializer.Serialize(loginData)
                 };
 
-                string jsonPacket = JsonSerializer.Serialize(packet);
-                await _writer.WriteLineAsync(jsonPacket);
+                await _writer.WriteLineAsync(JsonSerializer.Serialize(packet));
 
                 _ = Task.Run(() => ListenToServer());
             }
@@ -64,6 +58,38 @@ namespace Client
             {
                 Log($"Lỗi kết nối: {ex.Message}");
                 btnConnect.Enabled = true;
+            }
+        }
+
+        // HÀM MỚI: Xử lý khi bấm nút Gửi tin nhắn
+        private async void btnSend_Click(object sender, EventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(txtMessage.Text) || _crypto == null) return;
+
+            try
+            {
+                string message = txtMessage.Text;
+
+                // 1. Mã hóa tin nhắn bằng khóa AES
+                byte[] encryptedMessage = _crypto.EncryptAES(message);
+
+                // 2. Đóng gói vào Packet
+                var packet = new Packet
+                {
+                    Type = PacketType.Message,
+                    Sender = txtUsername.Text,
+                    Payload = encryptedMessage
+                };
+
+                // 3. Gửi đi
+                await _writer.WriteLineAsync(JsonSerializer.Serialize(packet));
+
+                Log($"[Tôi]: {message}");
+                txtMessage.Clear();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Lỗi gửi tin: " + ex.Message);
             }
         }
 
@@ -80,18 +106,12 @@ namespace Client
                     {
                         Packet receivedPacket = JsonSerializer.Deserialize<Packet>(responseData);
 
-                        // Xử lý khi Server gửi Public Key xuống
                         if (receivedPacket.Type == PacketType.KeyExchange)
                         {
-                            Log("Đang thiết lập khóa bảo mật Diffie-Hellman với Server...");
-
-                            // 1. Tạo bộ mã hóa riêng của Client
+                            Log("Đang thiết lập khóa bảo mật Diffie-Hellman...");
                             _crypto = new CryptoService();
-
-                            // 2. Lấy Public Key của Server để sinh ra Chìa khóa bí mật chung
                             _crypto.DeriveSharedSecret(receivedPacket.Payload);
 
-                            // 3. Gửi Public Key của mình lại cho Server
                             var keyPacket = new Packet
                             {
                                 Type = PacketType.KeyExchange,
@@ -99,8 +119,14 @@ namespace Client
                                 Payload = _crypto.PublicKey
                             };
                             await _writer.WriteLineAsync(JsonSerializer.Serialize(keyPacket));
-
                             Log("Thiết lập bảo mật thành công! Kênh truyền đã được mã hóa.");
+                        }
+                        // XỬ LÝ KHI NHẬN ĐƯỢC TIN NHẮN TỪ NGƯỜI KHÁC
+                        else if (receivedPacket.Type == PacketType.Message)
+                        {
+                            // Giải mã mảng byte lộn xộn trở lại thành chữ
+                            string decryptedMessage = _crypto.DecryptAES(receivedPacket.Payload);
+                            Log($"[{receivedPacket.Sender}]: {decryptedMessage}");
                         }
                     }
                     catch
@@ -124,7 +150,7 @@ namespace Client
             }
         }
 
-        // Tui giữ lại 2 hàm trống này để giao diện (Design) của bạn không bị báo lỗi thiếu hàm nhé
+        // Giữ lại các hàm trống này để tránh lỗi giao diện
         private void rtbClientLogs_TextChanged(object sender, EventArgs e) { }
         private void txtUsername_TextChanged(object sender, EventArgs e) { }
     }
