@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="Client/Client.csproj" />
+  <Project Path="Sever/Server.csproj" />
+  <Project Path="SharedCore/SharedCore.csproj" />
+</Solution>
