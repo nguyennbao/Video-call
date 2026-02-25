@@ -5,6 +5,7 @@ using System.Net.Sockets;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using System.Diagnostics;
 
 namespace Client
 {
@@ -24,14 +25,14 @@ namespace Client
         {
             if (string.IsNullOrWhiteSpace(txtUsername.Text))
             {
-                MessageBox.Show("Vui lòng nhập Username!");
+                MessageBox.Show("Vui lòng nhập tên người dùng!");
                 return;
             }
 
             try
             {
                 btnConnect.Enabled = false;
-                Log("Đang kết nối đến Server...");
+                Log("Đang kết nối tới Server...");
 
                 _client = new TcpClient();
                 await _client.ConnectAsync("127.0.0.1", 8888);
@@ -39,8 +40,6 @@ namespace Client
                 var stream = _client.GetStream();
                 _writer = new StreamWriter(stream) { AutoFlush = true };
                 _reader = new StreamReader(stream);
-
-                Log("Kết nối mạng thành công! Đang gửi thông tin chứng thực...");
 
                 var loginData = new LoginDTO { Username = txtUsername.Text, Password = "123" };
                 var packet = new Packet
@@ -51,45 +50,55 @@ namespace Client
                 };
 
                 await _writer.WriteLineAsync(JsonSerializer.Serialize(packet));
-
                 _ = Task.Run(() => ListenToServer());
             }
             catch (Exception ex)
             {
-                Log($"Lỗi kết nối: {ex.Message}");
+                Log($"Lỗi: {ex.Message}");
                 btnConnect.Enabled = true;
             }
         }
 
-        // HÀM MỚI: Xử lý khi bấm nút Gửi tin nhắn
         private async void btnSend_Click(object sender, EventArgs e)
         {
             if (string.IsNullOrWhiteSpace(txtMessage.Text) || _crypto == null) return;
-
             try
             {
-                string message = txtMessage.Text;
-
-                // 1. Mã hóa tin nhắn bằng khóa AES
-                byte[] encryptedMessage = _crypto.EncryptAES(message);
-
-                // 2. Đóng gói vào Packet
-                var packet = new Packet
-                {
-                    Type = PacketType.Message,
-                    Sender = txtUsername.Text,
-                    Payload = encryptedMessage
-                };
-
-                // 3. Gửi đi
+                string msg = txtMessage.Text;
+                byte[] encrypted = _crypto.EncryptAES(msg);
+                var packet = new Packet { Type = PacketType.Message, Sender = txtUsername.Text, Payload = encrypted };
                 await _writer.WriteLineAsync(JsonSerializer.Serialize(packet));
-
-                Log($"[Tôi]: {message}");
+                Log($"[Tôi]: {msg}");
                 txtMessage.Clear();
             }
-            catch (Exception ex)
+            catch (Exception ex) { MessageBox.Show(ex.Message); }
+        }
+
+        private async void btnSendFile_Click(object sender, EventArgs e)
+        {
+            if (_crypto == null) return;
+            using (OpenFileDialog ofd = new OpenFileDialog())
             {
-                MessageBox.Show("Lỗi gửi tin: " + ex.Message);
+                if (ofd.ShowDialog() == DialogResult.OK)
+                {
+                    try
+                    {
+                        byte[] fileBytes = File.ReadAllBytes(ofd.FileName);
+                        string base64 = Convert.ToBase64String(fileBytes);
+                        byte[] encrypted = _crypto.EncryptAES(base64);
+
+                        var packet = new Packet
+                        {
+                            Type = PacketType.File,
+                            Sender = txtUsername.Text,
+                            Content = Path.GetFileName(ofd.FileName),
+                            Payload = encrypted
+                        };
+                        await _writer.WriteLineAsync(JsonSerializer.Serialize(packet));
+                        Log($"[Hệ thống]: Đã gửi file {packet.Content}");
+                    }
+                    catch (Exception ex) { MessageBox.Show("Lỗi gửi file: " + ex.Message); }
+                }
             }
         }
 
@@ -99,59 +108,41 @@ namespace Client
             {
                 while (true)
                 {
-                    string responseData = await _reader.ReadLineAsync();
-                    if (responseData == null) break;
+                    string data = await _reader.ReadLineAsync();
+                    if (data == null) break;
+                    var packet = JsonSerializer.Deserialize<Packet>(data);
 
-                    try
+                    if (packet.Type == PacketType.KeyExchange)
                     {
-                        Packet receivedPacket = JsonSerializer.Deserialize<Packet>(responseData);
-
-                        if (receivedPacket.Type == PacketType.KeyExchange)
-                        {
-                            Log("Đang thiết lập khóa bảo mật Diffie-Hellman...");
-                            _crypto = new CryptoService();
-                            _crypto.DeriveSharedSecret(receivedPacket.Payload);
-
-                            var keyPacket = new Packet
-                            {
-                                Type = PacketType.KeyExchange,
-                                Sender = txtUsername.Text,
-                                Payload = _crypto.PublicKey
-                            };
-                            await _writer.WriteLineAsync(JsonSerializer.Serialize(keyPacket));
-                            Log("Thiết lập bảo mật thành công! Kênh truyền đã được mã hóa.");
-                        }
-                        // XỬ LÝ KHI NHẬN ĐƯỢC TIN NHẮN TỪ NGƯỜI KHÁC
-                        else if (receivedPacket.Type == PacketType.Message)
-                        {
-                            // Giải mã mảng byte lộn xộn trở lại thành chữ
-                            string decryptedMessage = _crypto.DecryptAES(receivedPacket.Payload);
-                            Log($"[{receivedPacket.Sender}]: {decryptedMessage}");
-                        }
+                        _crypto = new CryptoService();
+                        _crypto.DeriveSharedSecret(packet.Payload);
+                        var response = new Packet { Type = PacketType.KeyExchange, Sender = txtUsername.Text, Payload = _crypto.PublicKey };
+                        await _writer.WriteLineAsync(JsonSerializer.Serialize(response));
+                        Log("Bảo mật AES đã sẵn sàng!");
                     }
-                    catch
+                    else if (packet.Type == PacketType.Message)
                     {
-                        Log($"Server: {responseData}");
+                        string msg = _crypto.DecryptAES(packet.Payload);
+                        Log($"[{packet.Sender}]: {msg}");
+                    }
+                    else if (packet.Type == PacketType.File)
+                    {
+                        string fileName = packet.Content;
+                        byte[] fileBytes = Convert.FromBase64String(_crypto.DecryptAES(packet.Payload));
+
+                        // LƯU VÀO DOWNLOADS
+                        string downloadPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
+                        string fullPath = Path.Combine(downloadPath, fileName);
+                        File.WriteAllBytes(fullPath, fileBytes);
+
+                        Log($"[Hệ thống]: Nhận file thành công! Lưu tại Downloads\\{fileName}");
+                        Process.Start("explorer.exe", downloadPath); // Tự mở thư mục
                     }
                 }
             }
-            catch { Log("Đã mất kết nối với Server."); }
+            catch { Log("Mất kết nối."); }
         }
 
-        private void Log(string message)
-        {
-            if (rtbClientLogs.InvokeRequired)
-            {
-                rtbClientLogs.Invoke(new Action(() => Log(message)));
-            }
-            else
-            {
-                rtbClientLogs.AppendText($"{DateTime.Now:HH:mm:ss} - {message}\r\n");
-            }
-        }
-
-        // Giữ lại các hàm trống này để tránh lỗi giao diện
-        private void rtbClientLogs_TextChanged(object sender, EventArgs e) { }
-        private void txtUsername_TextChanged(object sender, EventArgs e) { }
+        private void Log(string m) => Invoke(new Action(() => rtbClientLogs.AppendText($"{m}\n")));
     }
 }
