@@ -250,6 +250,25 @@ namespace Client
 
         private void btnMic_Click_1(object sender, EventArgs e)
         {
+            if (_waveIn == null) return;
+            if (!_isMicOn)
+            {
+                _waveIn.StartRecording();
+                _isMicOn = true;
+                btnMic.Text = "Tắt Mic";
+                Log("Đã bật Mic.");
+            }
+            else
+            {
+                _waveIn.StopRecording();
+                _isMicOn = false;
+                btnMic.Text = "Bật Mic";
+                Log("Đã tắt Mic.");
+            }
+        }
+
+        private void picLocal_Click(object sender, EventArgs e)
+        {
 
         }
     }

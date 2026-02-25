@@ -89,6 +89,7 @@
             btnMic.TabIndex = 10;
             btnMic.Text = "Bật/Tắt Mic";
             btnMic.UseVisualStyleBackColor = true;
+            btnMic.Click += new System.EventHandler(this.btnMic_Click);
             // 
             // Form1
             // 

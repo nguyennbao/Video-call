@@ -113,6 +113,7 @@
             picLocal.SizeMode = PictureBoxSizeMode.Zoom;
             picLocal.TabIndex = 7;
             picLocal.TabStop = false;
+            picLocal.Click += picLocal_Click;
             // 
             // picRemote
             // 
