@@ -1,6 +1,6 @@
 using SharedCore;
 using System;
-using System.Collections.Generic;
+using System.Collections.Concurrent; // Đã thêm thư viện này để chống crash Server
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
@@ -14,8 +14,10 @@ namespace Sever
     {
         private TcpListener _server;
         private bool _isRunning = false;
-        private Dictionary<string, StreamWriter> _connectedClients = new Dictionary<string, StreamWriter>();
-        private Dictionary<string, CryptoService> _clientKeys = new Dictionary<string, CryptoService>();
+
+        // Đã đổi sang ConcurrentDictionary để Server không bị sập khi Client ngắt kết nối
+        private ConcurrentDictionary<string, StreamWriter> _connectedClients = new ConcurrentDictionary<string, StreamWriter>();
+        private ConcurrentDictionary<string, CryptoService> _clientKeys = new ConcurrentDictionary<string, CryptoService>();
 
         public Form1()
         {
@@ -126,10 +128,27 @@ namespace Sever
                     else if (receivedPacket.Type == PacketType.File)
                     {
                         string fileName = receivedPacket.Content;
-                        Log($"[Server] Đang chuyển tiếp file '{fileName}' từ {username}");
+                        Log($"[Server] Đang nhận và chuyển tiếp file '{fileName}' từ {username}");
 
                         // 1. Giải mã lấy nội dung gốc
                         string decryptedBase64 = _clientKeys[username].DecryptAES(receivedPacket.Payload);
+
+                        // =====================================================================
+                        // ĐOẠN CODE LƯU FILE VÀO THƯ MỤC DOWNLOADS CỦA MÁY SERVER
+                        // =====================================================================
+                        try
+                        {
+                            byte[] fileBytes = Convert.FromBase64String(decryptedBase64);
+                            string downloadPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
+                            string fullPath = Path.Combine(downloadPath, fileName);
+                            File.WriteAllBytes(fullPath, fileBytes);
+                            Log($"[Hệ thống Server]: Đã lưu file của {username} tại {fullPath}");
+                        }
+                        catch (Exception ex)
+                        {
+                            Log($"[Lỗi Server]: Không thể lưu file - {ex.Message}");
+                        }
+                        // =====================================================================
 
                         // 2. Khóa lại và gửi cho những người khác
                         foreach (var targetClient in _connectedClients)
@@ -156,10 +175,11 @@ namespace Sever
             }
             finally
             {
-                if (!string.IsNullOrEmpty(username) && _connectedClients.ContainsKey(username))
+                if (!string.IsNullOrEmpty(username))
                 {
-                    _connectedClients.Remove(username);
-                    _clientKeys.Remove(username);
+                    // Đã sửa lại hàm xóa Client thành TryRemove để tương thích với ConcurrentDictionary
+                    _connectedClients.TryRemove(username, out _);
+                    _clientKeys.TryRemove(username, out _);
                     Log($"[-] Client '{username}' đã ngắt kết nối.");
                 }
                 client.Close();
