@@ -32,14 +32,17 @@
             rtbLogs = new RichTextBox();
             btnSend = new Button();
             txtMessage = new TextBox();
-            picClientVideo = new PictureBox();
+            picServerVideo = new PictureBox();
             btnMic = new Button();
+            btnVideoServer = new Button();
+            picClientVideo = new PictureBox();
+            ((System.ComponentModel.ISupportInitialize)picServerVideo).BeginInit();
             ((System.ComponentModel.ISupportInitialize)picClientVideo).BeginInit();
             SuspendLayout();
             // 
             // btnStart
             // 
-            btnStart.Location = new Point(95, 312);
+            btnStart.Location = new Point(87, 312);
             btnStart.Name = "btnStart";
             btnStart.Size = new Size(230, 68);
             btnStart.TabIndex = 0;
@@ -58,9 +61,9 @@
             // 
             // btnSend
             // 
-            btnSend.Location = new Point(409, 312);
+            btnSend.Location = new Point(257, 236);
             btnSend.Name = "btnSend";
-            btnSend.Size = new Size(181, 68);
+            btnSend.Size = new Size(123, 44);
             btnSend.TabIndex = 2;
             btnSend.Text = "Gửi";
             btnSend.UseVisualStyleBackColor = true;
@@ -68,42 +71,65 @@
             // 
             // txtMessage
             // 
-            txtMessage.Location = new Point(245, 253);
+            txtMessage.Location = new Point(21, 245);
             txtMessage.Name = "txtMessage";
             txtMessage.Size = new Size(211, 27);
             txtMessage.TabIndex = 3;
             // 
-            // picClientVideo
+            // picServerVideo
             // 
-            picClientVideo.Location = new Point(431, 12);
-            picClientVideo.Name = "picClientVideo";
-            picClientVideo.Size = new Size(338, 204);
-            picClientVideo.TabIndex = 4;
-            picClientVideo.TabStop = false;
+            picServerVideo.Location = new Point(558, 290);
+            picServerVideo.Name = "picServerVideo";
+            picServerVideo.Size = new Size(215, 128);
+            picServerVideo.SizeMode = PictureBoxSizeMode.Zoom;
+            picServerVideo.TabIndex = 4;
+            picServerVideo.TabStop = false;
             // 
             // btnMic
             // 
-            btnMic.Location = new Point(658, 332);
+            btnMic.Location = new Point(441, 366);
             btnMic.Name = "btnMic";
             btnMic.Size = new Size(111, 29);
             btnMic.TabIndex = 10;
             btnMic.Text = "Bật/Tắt Mic";
             btnMic.UseVisualStyleBackColor = true;
-            btnMic.Click += new System.EventHandler(this.btnMic_Click);
+            btnMic.Click += btnMic_Click;
+            // 
+            // btnVideoServer
+            // 
+            btnVideoServer.Location = new Point(441, 312);
+            btnVideoServer.Name = "btnVideoServer";
+            btnVideoServer.Size = new Size(111, 29);
+            btnVideoServer.TabIndex = 11;
+            btnVideoServer.Text = "Bật Video";
+            btnVideoServer.UseVisualStyleBackColor = true;
+            btnVideoServer.Click += btnVideoServer_Click;
+            // 
+            // picClientVideo
+            // 
+            picClientVideo.Location = new Point(423, 23);
+            picClientVideo.Name = "picClientVideo";
+            picClientVideo.Size = new Size(312, 231);
+            picClientVideo.SizeMode = PictureBoxSizeMode.Zoom;
+            picClientVideo.TabIndex = 12;
+            picClientVideo.TabStop = false;
             // 
             // Form1
             // 
             AutoScaleDimensions = new SizeF(8F, 20F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(800, 450);
-            Controls.Add(btnMic);
             Controls.Add(picClientVideo);
+            Controls.Add(btnVideoServer);
+            Controls.Add(btnMic);
+            Controls.Add(picServerVideo);
             Controls.Add(txtMessage);
             Controls.Add(btnSend);
             Controls.Add(rtbLogs);
             Controls.Add(btnStart);
             Name = "Form1";
             Text = "Form1";
+            ((System.ComponentModel.ISupportInitialize)picServerVideo).EndInit();
             ((System.ComponentModel.ISupportInitialize)picClientVideo).EndInit();
             ResumeLayout(false);
             PerformLayout();
@@ -115,7 +141,9 @@
         private RichTextBox rtbLogs;
         private Button btnSend;
         private TextBox txtMessage;
-        private PictureBox picClientVideo;
+        private PictureBox picServerVideo;
         private Button btnMic;
+        private Button btnVideoServer;
+        private PictureBox picClientVideo;
     }
 }

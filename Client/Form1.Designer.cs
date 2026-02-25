@@ -44,16 +44,16 @@
             // 
             // txtUsername
             // 
-            txtUsername.Location = new Point(256, 12);
+            txtUsername.Location = new Point(69, 24);
             txtUsername.Name = "txtUsername";
             txtUsername.Size = new Size(237, 27);
             txtUsername.TabIndex = 0;
             // 
             // btnConnect
             // 
-            btnConnect.Location = new Point(12, 372);
+            btnConnect.Location = new Point(44, 357);
             btnConnect.Name = "btnConnect";
-            btnConnect.Size = new Size(136, 45);
+            btnConnect.Size = new Size(184, 60);
             btnConnect.TabIndex = 1;
             btnConnect.Text = "Kết nối Đăng nhập";
             btnConnect.UseVisualStyleBackColor = true;
@@ -70,16 +70,16 @@
             // 
             // txtMessage
             // 
-            txtMessage.Location = new Point(36, 301);
+            txtMessage.Location = new Point(29, 284);
             txtMessage.Name = "txtMessage";
             txtMessage.Size = new Size(199, 27);
             txtMessage.TabIndex = 3;
             // 
             // btnSend
             // 
-            btnSend.Location = new Point(189, 379);
+            btnSend.Location = new Point(163, 315);
             btnSend.Name = "btnSend";
-            btnSend.Size = new Size(87, 45);
+            btnSend.Size = new Size(65, 36);
             btnSend.TabIndex = 4;
             btnSend.Text = "Gửi";
             btnSend.UseVisualStyleBackColor = true;
@@ -87,9 +87,9 @@
             // 
             // btnSendFile
             // 
-            btnSendFile.Location = new Point(321, 372);
+            btnSendFile.Location = new Point(29, 317);
             btnSendFile.Name = "btnSendFile";
-            btnSendFile.Size = new Size(113, 59);
+            btnSendFile.Size = new Size(103, 34);
             btnSendFile.TabIndex = 5;
             btnSendFile.Text = "Gửi File Và Ảnh";
             btnSendFile.UseVisualStyleBackColor = true;
@@ -97,19 +97,19 @@
             // 
             // btnCall
             // 
-            btnCall.Location = new Point(645, 380);
+            btnCall.Location = new Point(345, 283);
             btnCall.Name = "btnCall";
             btnCall.Size = new Size(94, 29);
             btnCall.TabIndex = 6;
-            btnCall.Text = "Gọi Video";
+            btnCall.Text = "Bật Video";
             btnCall.UseVisualStyleBackColor = true;
             btnCall.Click += btnCall_Click;
             // 
             // picLocal
             // 
-            picLocal.Location = new Point(409, 79);
+            picLocal.Location = new Point(637, 304);
             picLocal.Name = "picLocal";
-            picLocal.Size = new Size(248, 199);
+            picLocal.Size = new Size(151, 134);
             picLocal.SizeMode = PictureBoxSizeMode.Zoom;
             picLocal.TabIndex = 7;
             picLocal.TabStop = false;
@@ -117,16 +117,16 @@
             // 
             // picRemote
             // 
-            picRemote.Location = new Point(663, 241);
+            picRemote.Location = new Point(345, 87);
             picRemote.Name = "picRemote";
-            picRemote.Size = new Size(125, 133);
+            picRemote.Size = new Size(344, 190);
             picRemote.SizeMode = PictureBoxSizeMode.Zoom;
             picRemote.TabIndex = 8;
             picRemote.TabStop = false;
             // 
             // btnMic
             // 
-            btnMic.Location = new Point(490, 379);
+            btnMic.Location = new Point(481, 284);
             btnMic.Name = "btnMic";
             btnMic.Size = new Size(111, 29);
             btnMic.TabIndex = 9;

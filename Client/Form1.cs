@@ -7,7 +7,6 @@ using System.Net.Sockets;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using System.Diagnostics;
 using AForge.Video;
 using AForge.Video.DirectShow;
 using NAudio.Wave;
@@ -99,25 +98,37 @@ namespace Client
             }
         }
 
-        private void btnCall_Click(object sender, EventArgs e)
+        private async void btnCall_Click(object sender, EventArgs e)
         {
             if (videoSource == null) return;
             if (!isCalling)
             {
-                videoSource.Start();
                 isCalling = true;
+                videoSource.Start();
                 btnCall.Text = "Tắt Gọi Video";
                 callStartTime = DateTime.Now;
                 Log("Đã bật camera.");
             }
             else
             {
+                isCalling = false; // Ngắt lập tức
                 videoSource.SignalToStop();
-                videoSource.WaitForStop();
-                isCalling = false;
+
                 btnCall.Text = "Bật Gọi Video";
                 if (picLocal.Image != null) { picLocal.Image.Dispose(); picLocal.Image = null; }
+                picLocal.Invalidate();
                 Log("Đã tắt camera.");
+
+                // TRÌ HOÃN 0.3 GIÂY
+                await Task.Delay(300);
+
+                // Báo cho Server biết mình đã tắt cam
+                if (_writer != null && _crypto != null)
+                {
+                    byte[] encryptedStop = _crypto.EncryptAES("STOP");
+                    var packet = new Packet { Type = PacketType.VideoFrame, Sender = txtUsername.Text, Content = "STOP_VIDEO", Payload = encryptedStop };
+                    await _writer.WriteLineAsync(JsonSerializer.Serialize(packet));
+                }
 
                 try
                 {
@@ -131,6 +142,7 @@ namespace Client
 
         private async void videoSource_NewFrame(object sender, NewFrameEventArgs eventArgs)
         {
+            if (!isCalling) return; // Chặn lập tức các frame bị sót lại
             try
             {
                 Bitmap frame = (Bitmap)eventArgs.Frame.Clone();
@@ -212,17 +224,28 @@ namespace Client
                     }
                     else if (packet.Type == PacketType.VideoFrame)
                     {
-                        string base64 = _crypto.DecryptAES(packet.Payload);
-                        byte[] imageBytes = Convert.FromBase64String(base64);
-                        using (MemoryStream ms = new MemoryStream(imageBytes))
-                        using (Image img = Image.FromStream(ms))
+                        if (packet.Content == "STOP_VIDEO")
                         {
-                            Bitmap bitmapToDisplay = new Bitmap(img);
                             picRemote.Invoke(new Action(() =>
                             {
-                                if (picRemote.Image != null) picRemote.Image.Dispose();
-                                picRemote.Image = bitmapToDisplay;
+                                if (picRemote.Image != null) { picRemote.Image.Dispose(); picRemote.Image = null; }
+                                picRemote.Invalidate();
                             }));
+                        }
+                        else
+                        {
+                            string base64 = _crypto.DecryptAES(packet.Payload);
+                            byte[] imageBytes = Convert.FromBase64String(base64);
+                            using (MemoryStream ms = new MemoryStream(imageBytes))
+                            using (Image img = Image.FromStream(ms))
+                            {
+                                Bitmap bitmapToDisplay = new Bitmap(img);
+                                picRemote.Invoke(new Action(() =>
+                                {
+                                    if (picRemote.Image != null) picRemote.Image.Dispose();
+                                    picRemote.Image = bitmapToDisplay;
+                                }));
+                            }
                         }
                     }
                     else if (packet.Type == PacketType.AudioFrame)
@@ -234,7 +257,6 @@ namespace Client
                             _waveProvider.AddSamples(audioBytes, 0, audioBytes.Length);
                         }
                     }
-                    // --- NHẬN FILE/ẢNH TỪ NGƯỜI KHÁC ---
                     else if (packet.Type == PacketType.File)
                     {
                         try
@@ -243,22 +265,16 @@ namespace Client
                             byte[] fileBytes = Convert.FromBase64String(base64File);
                             string fileName = packet.Content;
 
-                            // Tạo thư mục "ReceivedFiles" 
                             string savePath = Path.Combine(Application.StartupPath, "ReceivedFiles");
                             if (!Directory.Exists(savePath))
                                 Directory.CreateDirectory(savePath);
 
-                            // Lưu file
                             string fullPath = Path.Combine(savePath, $"{packet.Sender}_{fileName}");
                             File.WriteAllBytes(fullPath, fileBytes);
 
                             Log($"[{packet.Sender}] đã gửi một file: {fileName}");
-                            Log($"-> Đã lưu tại thư mục ReceivedFiles");
                         }
-                        catch (Exception ex)
-                        {
-                            Log($"Lỗi nhận file: {ex.Message}");
-                        }
+                        catch { }
                     }
                 }
             }
@@ -291,8 +307,6 @@ namespace Client
             using (OpenFileDialog ofd = new OpenFileDialog())
             {
                 ofd.Filter = "Tất cả các file|*.*|Hình ảnh|*.jpg;*.jpeg;*.png;*.bmp";
-                ofd.Title = "Chọn file hoặc ảnh để gửi";
-
                 if (ofd.ShowDialog() == DialogResult.OK)
                 {
                     try
@@ -301,7 +315,6 @@ namespace Client
                         string fileName = Path.GetFileName(filePath);
                         byte[] fileBytes = File.ReadAllBytes(filePath);
                         string base64File = Convert.ToBase64String(fileBytes);
-
                         byte[] encryptedFile = _crypto.EncryptAES(base64File);
 
                         var packet = new Packet
@@ -315,10 +328,7 @@ namespace Client
                         await _writer.WriteLineAsync(JsonSerializer.Serialize(packet));
                         Log($"[Tôi]: Đã gửi file {fileName}");
                     }
-                    catch (Exception ex)
-                    {
-                        Log($"Lỗi khi gửi file: {ex.Message}");
-                    }
+                    catch (Exception ex) { Log($"Lỗi khi gửi file: {ex.Message}"); }
                 }
             }
         }
