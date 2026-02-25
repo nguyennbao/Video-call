@@ -10,7 +10,7 @@ using System.Windows.Forms;
 using System.Diagnostics;
 using AForge.Video;
 using AForge.Video.DirectShow;
-using NAudio.Wave; // Thư viện âm thanh
+using NAudio.Wave;
 
 namespace Client
 {
@@ -21,29 +21,27 @@ namespace Client
         private StreamReader _reader;
         private CryptoService _crypto;
 
-        // Biến Hình ảnh
         private FilterInfoCollection videoDevices;
         private VideoCaptureDevice videoSource;
         private bool isCalling = false;
         private bool isSendingFrame = false;
 
-        // Biến Âm thanh
         private WaveInEvent _waveIn;
         private WaveOutEvent _waveOut;
         private BufferedWaveProvider _waveProvider;
         private bool _isMicOn = false;
 
+        private DateTime callStartTime;
+
         public Form1()
         {
             InitializeComponent();
-            // Tự động liên kết sự kiện
             this.Load += Form1_Load;
             this.FormClosing += Form1_FormClosing;
         }
 
         private void Form1_Load(object sender, EventArgs e)
         {
-            // Cài đặt Camera
             videoDevices = new FilterInfoCollection(FilterCategory.VideoInputDevice);
             if (videoDevices.Count > 0)
             {
@@ -51,7 +49,6 @@ namespace Client
                 videoSource.NewFrame += new NewFrameEventHandler(videoSource_NewFrame);
             }
 
-            // Cài đặt Mic và Loa
             try
             {
                 _waveIn = new WaveInEvent();
@@ -67,7 +64,6 @@ namespace Client
             catch { Log("Không tìm thấy thiết bị Âm thanh trên Client này."); }
         }
 
-        // --- XỬ LÝ ÂM THANH ---
         private async void WaveIn_DataAvailable(object sender, WaveInEventArgs e)
         {
             if (!_isMicOn || _crypto == null || _writer == null) return;
@@ -84,7 +80,7 @@ namespace Client
             catch { }
         }
 
-        private void btnMic_Click(object sender, EventArgs e)
+        private void btnMic_Click_1(object sender, EventArgs e)
         {
             if (_waveIn == null) return;
             if (!_isMicOn)
@@ -103,7 +99,6 @@ namespace Client
             }
         }
 
-        // --- XỬ LÝ HÌNH ẢNH ---
         private void btnCall_Click(object sender, EventArgs e)
         {
             if (videoSource == null) return;
@@ -112,6 +107,7 @@ namespace Client
                 videoSource.Start();
                 isCalling = true;
                 btnCall.Text = "Tắt Gọi Video";
+                callStartTime = DateTime.Now;
                 Log("Đã bật camera.");
             }
             else
@@ -122,6 +118,14 @@ namespace Client
                 btnCall.Text = "Bật Gọi Video";
                 if (picLocal.Image != null) { picLocal.Image.Dispose(); picLocal.Image = null; }
                 Log("Đã tắt camera.");
+
+                try
+                {
+                    TimeSpan duration = DateTime.Now - callStartTime;
+                    string callLog = $"[{DateTime.Now:dd/MM/yyyy HH:mm:ss}] {txtUsername.Text} đã thực hiện cuộc gọi video kéo dài {duration.Hours:D2}:{duration.Minutes:D2}:{duration.Seconds:D2}\r\n";
+                    File.AppendAllText("CallHistory.txt", callLog);
+                }
+                catch { }
             }
         }
 
@@ -161,7 +165,6 @@ namespace Client
             catch { isSendingFrame = false; }
         }
 
-        // --- XỬ LÝ KẾT NỐI VÀ DATA ---
         private async void btnConnect_Click(object sender, EventArgs e)
         {
             if (string.IsNullOrWhiteSpace(txtUsername.Text)) return;
@@ -222,7 +225,6 @@ namespace Client
                             }));
                         }
                     }
-                    // NHẬN ÂM THANH TỪ SERVER VÀ PHÁT RA LOA
                     else if (packet.Type == PacketType.AudioFrame)
                     {
                         string base64 = _crypto.DecryptAES(packet.Payload);
@@ -232,9 +234,93 @@ namespace Client
                             _waveProvider.AddSamples(audioBytes, 0, audioBytes.Length);
                         }
                     }
+                    // --- NHẬN FILE/ẢNH TỪ NGƯỜI KHÁC ---
+                    else if (packet.Type == PacketType.File)
+                    {
+                        try
+                        {
+                            string base64File = _crypto.DecryptAES(packet.Payload);
+                            byte[] fileBytes = Convert.FromBase64String(base64File);
+                            string fileName = packet.Content;
+
+                            // Tạo thư mục "ReceivedFiles" 
+                            string savePath = Path.Combine(Application.StartupPath, "ReceivedFiles");
+                            if (!Directory.Exists(savePath))
+                                Directory.CreateDirectory(savePath);
+
+                            // Lưu file
+                            string fullPath = Path.Combine(savePath, $"{packet.Sender}_{fileName}");
+                            File.WriteAllBytes(fullPath, fileBytes);
+
+                            Log($"[{packet.Sender}] đã gửi một file: {fileName}");
+                            Log($"-> Đã lưu tại thư mục ReceivedFiles");
+                        }
+                        catch (Exception ex)
+                        {
+                            Log($"Lỗi nhận file: {ex.Message}");
+                        }
+                    }
                 }
             }
             catch { Log("Mất kết nối."); }
+        }
+
+        private async void btnSend_Click(object sender, EventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(txtMessage.Text) || _writer == null || _crypto == null) return;
+            try
+            {
+                string message = txtMessage.Text;
+                Log($"[Tôi]: {message}");
+                byte[] encryptedMessage = _crypto.EncryptAES(message);
+                var packet = new Packet { Type = PacketType.Message, Sender = txtUsername.Text, Payload = encryptedMessage };
+                await _writer.WriteLineAsync(JsonSerializer.Serialize(packet));
+                txtMessage.Clear();
+            }
+            catch { }
+        }
+
+        private async void btnSendFile_Click(object sender, EventArgs e)
+        {
+            if (_writer == null || _crypto == null)
+            {
+                MessageBox.Show("Vui lòng kết nối tới Server trước khi gửi file!");
+                return;
+            }
+
+            using (OpenFileDialog ofd = new OpenFileDialog())
+            {
+                ofd.Filter = "Tất cả các file|*.*|Hình ảnh|*.jpg;*.jpeg;*.png;*.bmp";
+                ofd.Title = "Chọn file hoặc ảnh để gửi";
+
+                if (ofd.ShowDialog() == DialogResult.OK)
+                {
+                    try
+                    {
+                        string filePath = ofd.FileName;
+                        string fileName = Path.GetFileName(filePath);
+                        byte[] fileBytes = File.ReadAllBytes(filePath);
+                        string base64File = Convert.ToBase64String(fileBytes);
+
+                        byte[] encryptedFile = _crypto.EncryptAES(base64File);
+
+                        var packet = new Packet
+                        {
+                            Type = PacketType.File,
+                            Sender = txtUsername.Text,
+                            Content = fileName,
+                            Payload = encryptedFile
+                        };
+
+                        await _writer.WriteLineAsync(JsonSerializer.Serialize(packet));
+                        Log($"[Tôi]: Đã gửi file {fileName}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Log($"Lỗi khi gửi file: {ex.Message}");
+                    }
+                }
+            }
         }
 
         private void Form1_FormClosing(object sender, FormClosingEventArgs e)
@@ -245,31 +331,7 @@ namespace Client
         }
 
         private void Log(string m) => Invoke(new Action(() => rtbClientLogs.AppendText($"{m}\n")));
-        private async void btnSend_Click(object sender, EventArgs e) { /* Giữ code cũ để tránh quá dài */ }
-        private async void btnSendFile_Click(object sender, EventArgs e) { /* Giữ code cũ để tránh quá dài */ }
 
-        private void btnMic_Click_1(object sender, EventArgs e)
-        {
-            if (_waveIn == null) return;
-            if (!_isMicOn)
-            {
-                _waveIn.StartRecording();
-                _isMicOn = true;
-                btnMic.Text = "Tắt Mic";
-                Log("Đã bật Mic.");
-            }
-            else
-            {
-                _waveIn.StopRecording();
-                _isMicOn = false;
-                btnMic.Text = "Bật Mic";
-                Log("Đã tắt Mic.");
-            }
-        }
-
-        private void picLocal_Click(object sender, EventArgs e)
-        {
-
-        }
+        private void picLocal_Click(object sender, EventArgs e) { }
     }
 }

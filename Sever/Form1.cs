@@ -29,7 +29,6 @@ namespace Sever
         public Form1()
         {
             InitializeComponent();
-            // Tự động liên kết sự kiện Form Load và Close
             this.Load += Form1_Load;
             this.FormClosing += Form1_FormClosing;
         }
@@ -45,7 +44,7 @@ namespace Sever
 
                 _waveOut = new WaveOutEvent();
                 _waveProvider = new BufferedWaveProvider(_waveIn.WaveFormat);
-                _waveProvider.DiscardOnBufferOverflow = true; // Chống tràn RAM loa
+                _waveProvider.DiscardOnBufferOverflow = true;
                 _waveOut.Init(_waveProvider);
                 _waveOut.Play();
             }
@@ -62,7 +61,6 @@ namespace Sever
                 Array.Copy(e.Buffer, audioData, e.BytesRecorded);
                 string base64 = Convert.ToBase64String(audioData);
 
-                // Server nói, mã hóa riêng cho từng Client và gửi đi
                 foreach (var clientInfo in _connectedClients)
                 {
                     string username = clientInfo.Key;
@@ -76,7 +74,7 @@ namespace Sever
                     }
                 }
             }
-            catch { /* Bỏ qua lỗi mạng khi đang nói */ }
+            catch { }
         }
 
         private void btnMic_Click(object sender, EventArgs e)
@@ -170,11 +168,47 @@ namespace Sever
                     {
                         string decryptedMessage = _clientKeys[username].DecryptAES(receivedPacket.Payload);
                         Log($"[Chat] {username} gửi: {decryptedMessage}");
-                        BroadcastData(username, PacketType.Message, receivedPacket.Payload); // Gửi cho mọi người
+
+                        try
+                        {
+                            string chatLog = $"[{DateTime.Now:dd/MM/yyyy HH:mm:ss}] {username}: {decryptedMessage}\r\n";
+                            File.AppendAllText("ChatHistory.txt", chatLog);
+                        }
+                        catch { }
+
+                        BroadcastData(username, PacketType.Message, receivedPacket.Payload);
                     }
+                    // --- XỬ LÝ NHẬN VÀ CHUYỂN TIẾP FILE ---
                     else if (receivedPacket.Type == PacketType.File)
                     {
-                        BroadcastData(username, PacketType.File, receivedPacket.Payload, receivedPacket.Content);
+                        try
+                        {
+                            // 1. Giải mã file để Server đọc được
+                            string decryptedBase64 = _clientKeys[username].DecryptAES(receivedPacket.Payload);
+                            byte[] fileBytes = Convert.FromBase64String(decryptedBase64);
+                            string fileName = receivedPacket.Content; // Tên file nằm trong Content
+
+                            // 2. Tạo thư mục để Server tự lưu file
+                            string savePath = Path.Combine(Application.StartupPath, "ServerReceivedFiles");
+                            if (!Directory.Exists(savePath))
+                            {
+                                Directory.CreateDirectory(savePath);
+                            }
+
+                            // 3. Ghi file ra ổ cứng của Server
+                            string fullPath = Path.Combine(savePath, $"{username}_{fileName}");
+                            File.WriteAllBytes(fullPath, fileBytes);
+
+                            Log($"[Hệ thống] {username} vừa gửi file: {fileName}");
+                            Log($"-> Server đã lưu file tại: ServerReceivedFiles");
+
+                            // 4. Chuyển tiếp file cho các Client khác
+                            BroadcastData(username, PacketType.File, receivedPacket.Payload, receivedPacket.Content);
+                        }
+                        catch (Exception ex)
+                        {
+                            Log($"Lỗi khi Server xử lý file từ {username}: {ex.Message}");
+                        }
                     }
                     else if (receivedPacket.Type == PacketType.VideoFrame)
                     {
@@ -195,19 +229,16 @@ namespace Sever
                         catch { }
                         BroadcastData(username, PacketType.VideoFrame, receivedPacket.Payload);
                     }
-                    // SERVER NHẬN ÂM THANH: PHÁT RA LOA VÀ CHUYỂN TIẾP CHO NGƯỜI KHÁC
                     else if (receivedPacket.Type == PacketType.AudioFrame)
                     {
                         string decryptedBase64 = _clientKeys[username].DecryptAES(receivedPacket.Payload);
                         byte[] audioBytes = Convert.FromBase64String(decryptedBase64);
 
-                        // 1. Phát ra loa của Server
                         if (_waveProvider != null)
                         {
                             _waveProvider.AddSamples(audioBytes, 0, audioBytes.Length);
                         }
 
-                        // 2. Chuyển tiếp cho các Client khác
                         BroadcastData(username, PacketType.AudioFrame, receivedPacket.Payload);
                     }
                 }
@@ -225,7 +256,6 @@ namespace Sever
             }
         }
 
-        // Hàm hỗ trợ trung chuyển dữ liệu gọn gàng hơn
         private async void BroadcastData(string senderUsername, PacketType type, byte[] originalPayload, string content = null)
         {
             string decryptedBase64 = _clientKeys[senderUsername].DecryptAES(originalPayload);
@@ -248,6 +278,14 @@ namespace Sever
             try
             {
                 Log($"[Server]: {message}");
+
+                try
+                {
+                    string chatLog = $"[{DateTime.Now:dd/MM/yyyy HH:mm:ss}] Server: {message}\r\n";
+                    File.AppendAllText("ChatHistory.txt", chatLog);
+                }
+                catch { }
+
                 foreach (var clientInfo in _connectedClients)
                 {
                     if (_clientKeys.ContainsKey(clientInfo.Key))
