@@ -34,6 +34,11 @@
             txtMessage = new TextBox();
             btnSend = new Button();
             btnSendFile = new Button();
+            btnCall = new Button();
+            picLocal = new PictureBox();
+            picRemote = new PictureBox();
+            ((System.ComponentModel.ISupportInitialize)picLocal).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)picRemote).BeginInit();
             SuspendLayout();
             // 
             // txtUsername
@@ -42,13 +47,12 @@
             txtUsername.Name = "txtUsername";
             txtUsername.Size = new Size(237, 27);
             txtUsername.TabIndex = 0;
-            
             // 
             // btnConnect
             // 
-            btnConnect.Location = new Point(54, 364);
+            btnConnect.Location = new Point(12, 372);
             btnConnect.Name = "btnConnect";
-            btnConnect.Size = new Size(181, 74);
+            btnConnect.Size = new Size(136, 45);
             btnConnect.TabIndex = 1;
             btnConnect.Text = "Kết nối Đăng nhập";
             btnConnect.UseVisualStyleBackColor = true;
@@ -56,26 +60,25 @@
             // 
             // rtbClientLogs
             // 
-            rtbClientLogs.Location = new Point(216, 58);
+            rtbClientLogs.Location = new Point(29, 87);
             rtbClientLogs.Name = "rtbClientLogs";
             rtbClientLogs.ReadOnly = true;
-            rtbClientLogs.Size = new Size(342, 208);
+            rtbClientLogs.Size = new Size(277, 166);
             rtbClientLogs.TabIndex = 2;
             rtbClientLogs.Text = "";
-            
             // 
             // txtMessage
             // 
-            txtMessage.Location = new Point(294, 299);
+            txtMessage.Location = new Point(36, 301);
             txtMessage.Name = "txtMessage";
             txtMessage.Size = new Size(199, 27);
             txtMessage.TabIndex = 3;
             // 
             // btnSend
             // 
-            btnSend.Location = new Point(294, 364);
+            btnSend.Location = new Point(189, 379);
             btnSend.Name = "btnSend";
-            btnSend.Size = new Size(130, 74);
+            btnSend.Size = new Size(87, 45);
             btnSend.TabIndex = 4;
             btnSend.Text = "Gửi";
             btnSend.UseVisualStyleBackColor = true;
@@ -83,19 +86,50 @@
             // 
             // btnSendFile
             // 
-            btnSendFile.Location = new Point(503, 364);
+            btnSendFile.Location = new Point(321, 372);
             btnSendFile.Name = "btnSendFile";
-            btnSendFile.Size = new Size(130, 74);
+            btnSendFile.Size = new Size(113, 59);
             btnSendFile.TabIndex = 5;
             btnSendFile.Text = "Gửi File Và Ảnh";
             btnSendFile.UseVisualStyleBackColor = true;
             btnSendFile.Click += btnSendFile_Click;
+            // 
+            // btnCall
+            // 
+            btnCall.Location = new Point(561, 377);
+            btnCall.Name = "btnCall";
+            btnCall.Size = new Size(94, 29);
+            btnCall.TabIndex = 6;
+            btnCall.Text = "Gọi Video";
+            btnCall.UseVisualStyleBackColor = true;
+            // 
+            // picLocal
+            // 
+            picLocal.Location = new Point(409, 79);
+            picLocal.Name = "picLocal";
+            picLocal.Size = new Size(134, 133);
+            picLocal.SizeMode = PictureBoxSizeMode.Zoom;
+            picLocal.TabIndex = 7;
+            picLocal.TabStop = false;
+            // 
+            // picRemote
+            // 
+            picRemote.Location = new Point(660, 79);
+            picRemote.Name = "picRemote";
+            picRemote.Size = new Size(125, 133);
+            picRemote.SizeMode = PictureBoxSizeMode.Zoom;
+            picRemote.TabIndex = 8;
+            picRemote.TabStop = false;
+            
             // 
             // Form1
             // 
             AutoScaleDimensions = new SizeF(8F, 20F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(800, 450);
+            Controls.Add(picRemote);
+            Controls.Add(picLocal);
+            Controls.Add(btnCall);
             Controls.Add(btnSendFile);
             Controls.Add(btnSend);
             Controls.Add(txtMessage);
@@ -104,6 +138,8 @@
             Controls.Add(txtUsername);
             Name = "Form1";
             Text = "Form1";
+            ((System.ComponentModel.ISupportInitialize)picLocal).EndInit();
+            ((System.ComponentModel.ISupportInitialize)picRemote).EndInit();
             ResumeLayout(false);
             PerformLayout();
         }
@@ -116,5 +152,8 @@
         private TextBox txtMessage;
         private Button btnSend;
         private Button btnSendFile;
+        private Button btnCall;
+        private PictureBox picLocal;
+        private PictureBox picRemote;
     }
 }

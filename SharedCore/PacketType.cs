@@ -10,6 +10,7 @@ namespace SharedCore
         LoginResponse,  // Phản hồi đăng nhập (thành công/thất bại)
         Message,        // Tin nhắn văn bản
         File,           // Gửi file/hình ảnh
-        KeyExchange     // Trao đổi khóa Diffie-Hellman
+        KeyExchange,    // Trao đổi khóa Diffie-Hellman
+        VideoFrame      // Khung hình video camera
     }
 }
