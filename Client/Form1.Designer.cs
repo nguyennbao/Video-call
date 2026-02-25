@@ -37,6 +37,7 @@
             btnCall = new Button();
             picLocal = new PictureBox();
             picRemote = new PictureBox();
+            btnMic = new Button();
             ((System.ComponentModel.ISupportInitialize)picLocal).BeginInit();
             ((System.ComponentModel.ISupportInitialize)picRemote).BeginInit();
             SuspendLayout();
@@ -96,37 +97,48 @@
             // 
             // btnCall
             // 
-            btnCall.Location = new Point(561, 377);
+            btnCall.Location = new Point(645, 380);
             btnCall.Name = "btnCall";
             btnCall.Size = new Size(94, 29);
             btnCall.TabIndex = 6;
             btnCall.Text = "Gọi Video";
             btnCall.UseVisualStyleBackColor = true;
+            btnCall.Click += btnCall_Click;
             // 
             // picLocal
             // 
             picLocal.Location = new Point(409, 79);
             picLocal.Name = "picLocal";
-            picLocal.Size = new Size(134, 133);
+            picLocal.Size = new Size(248, 199);
             picLocal.SizeMode = PictureBoxSizeMode.Zoom;
             picLocal.TabIndex = 7;
             picLocal.TabStop = false;
             // 
             // picRemote
             // 
-            picRemote.Location = new Point(660, 79);
+            picRemote.Location = new Point(663, 241);
             picRemote.Name = "picRemote";
             picRemote.Size = new Size(125, 133);
             picRemote.SizeMode = PictureBoxSizeMode.Zoom;
             picRemote.TabIndex = 8;
             picRemote.TabStop = false;
-            
+            // 
+            // btnMic
+            // 
+            btnMic.Location = new Point(490, 379);
+            btnMic.Name = "btnMic";
+            btnMic.Size = new Size(111, 29);
+            btnMic.TabIndex = 9;
+            btnMic.Text = "Bật Mic";
+            btnMic.UseVisualStyleBackColor = true;
+            btnMic.Click += btnMic_Click_1;
             // 
             // Form1
             // 
             AutoScaleDimensions = new SizeF(8F, 20F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(800, 450);
+            Controls.Add(btnMic);
             Controls.Add(picRemote);
             Controls.Add(picLocal);
             Controls.Add(btnCall);
@@ -138,6 +150,8 @@
             Controls.Add(txtUsername);
             Name = "Form1";
             Text = "Form1";
+            FormClosing += Form1_FormClosing;
+            Load += Form1_Load;
             ((System.ComponentModel.ISupportInitialize)picLocal).EndInit();
             ((System.ComponentModel.ISupportInitialize)picRemote).EndInit();
             ResumeLayout(false);
@@ -155,5 +169,6 @@
         private Button btnCall;
         private PictureBox picLocal;
         private PictureBox picRemote;
+        private Button btnMic;
     }
 }

@@ -11,6 +11,7 @@ namespace SharedCore
         Message,        // Tin nhắn văn bản
         File,           // Gửi file/hình ảnh
         KeyExchange,    // Trao đổi khóa Diffie-Hellman
-        VideoFrame      // Khung hình video camera
+        VideoFrame,      // Khung hình video camera
+        AudioFrame
     }
 }
