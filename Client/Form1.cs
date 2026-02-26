@@ -39,8 +39,42 @@ namespace Client
             this.FormClosing += Form1_FormClosing;
         }
 
+        // ---------------- THÊM HÀM LƯU/TẢI LỊCH SỬ CHAT ----------------
+        private void SaveChatHistory(string sender, string message)
+        {
+            try
+            {
+                string filePath = Path.Combine(Application.StartupPath, "ChatHistory_Client.txt");
+                string logLine = $"[{DateTime.Now:dd/MM/yyyy HH:mm:ss}] {sender}: {message}\r\n";
+                File.AppendAllText(filePath, logLine);
+            }
+            catch { }
+        }
+
+        private void LoadChatHistory()
+        {
+            try
+            {
+                string filePath = Path.Combine(Application.StartupPath, "ChatHistory_Client.txt");
+                if (File.Exists(filePath))
+                {
+                    string history = File.ReadAllText(filePath);
+                    Invoke(new Action(() => {
+                        rtbClientLogs.AppendText("--- LỊCH SỬ CHAT CŨ ---\n");
+                        rtbClientLogs.AppendText(history);
+                        rtbClientLogs.AppendText("-----------------------\n");
+                    }));
+                }
+            }
+            catch { }
+        }
+        // -----------------------------------------------------------------
+
         private void Form1_Load(object sender, EventArgs e)
         {
+            // Tải lịch sử chat khi mở app
+            LoadChatHistory();
+
             videoDevices = new FilterInfoCollection(FilterCategory.VideoInputDevice);
             if (videoDevices.Count > 0)
             {
@@ -111,7 +145,7 @@ namespace Client
             }
             else
             {
-                isCalling = false; // Ngắt lập tức
+                isCalling = false;
                 videoSource.SignalToStop();
 
                 btnCall.Text = "Bật Gọi Video";
@@ -119,10 +153,8 @@ namespace Client
                 picLocal.Invalidate();
                 Log("Đã tắt camera.");
 
-                // TRÌ HOÃN 0.3 GIÂY
                 await Task.Delay(300);
 
-                // Báo cho Server biết mình đã tắt cam
                 if (_writer != null && _crypto != null)
                 {
                     byte[] encryptedStop = _crypto.EncryptAES("STOP");
@@ -142,7 +174,7 @@ namespace Client
 
         private async void videoSource_NewFrame(object sender, NewFrameEventArgs eventArgs)
         {
-            if (!isCalling) return; // Chặn lập tức các frame bị sót lại
+            if (!isCalling) return;
             try
             {
                 Bitmap frame = (Bitmap)eventArgs.Frame.Clone();
@@ -221,6 +253,8 @@ namespace Client
                     {
                         string msg = _crypto.DecryptAES(packet.Payload);
                         Log($"[{packet.Sender}]: {msg}");
+                        // LƯU LỊCH SỬ TIN NHẮN NHẬN ĐƯỢC
+                        SaveChatHistory(packet.Sender, msg);
                     }
                     else if (packet.Type == PacketType.VideoFrame)
                     {
@@ -288,6 +322,10 @@ namespace Client
             {
                 string message = txtMessage.Text;
                 Log($"[Tôi]: {message}");
+
+                // LƯU LỊCH SỬ TIN NHẮN GỬI ĐI
+                SaveChatHistory("Tôi", message);
+
                 byte[] encryptedMessage = _crypto.EncryptAES(message);
                 var packet = new Packet { Type = PacketType.Message, Sender = txtUsername.Text, Payload = encryptedMessage };
                 await _writer.WriteLineAsync(JsonSerializer.Serialize(packet));

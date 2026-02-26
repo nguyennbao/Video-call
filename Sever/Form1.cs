@@ -42,8 +42,42 @@ namespace Sever
             this.FormClosing += Form1_FormClosing;
         }
 
+        // ---------------- THÊM HÀM LƯU/TẢI LỊCH SỬ CHAT ----------------
+        private void SaveChatHistory(string sender, string message)
+        {
+            try
+            {
+                string filePath = Path.Combine(Application.StartupPath, "ChatHistory_Server.txt");
+                string logLine = $"[{DateTime.Now:dd/MM/yyyy HH:mm:ss}] {sender}: {message}\r\n";
+                File.AppendAllText(filePath, logLine);
+            }
+            catch { }
+        }
+
+        private void LoadChatHistory()
+        {
+            try
+            {
+                string filePath = Path.Combine(Application.StartupPath, "ChatHistory_Server.txt");
+                if (File.Exists(filePath))
+                {
+                    string history = File.ReadAllText(filePath);
+                    Invoke(new Action(() => {
+                        rtbLogs.AppendText("--- LỊCH SỬ CHAT CŨ ---\n");
+                        rtbLogs.AppendText(history);
+                        rtbLogs.AppendText("-----------------------\n");
+                    }));
+                }
+            }
+            catch { }
+        }
+        // -----------------------------------------------------------------
+
         private void Form1_Load(object sender, EventArgs e)
         {
+            // Tải lịch sử chat khi mở Server
+            LoadChatHistory();
+
             // Cài đặt Camera
             try
             {
@@ -74,7 +108,6 @@ namespace Sever
 
         private async void videoSource_NewFrame(object sender, NewFrameEventArgs eventArgs)
         {
-            // Thêm cờ chặn ngay lập tức nếu đang tắt cam
             if (!isServerVideoOn || isSendingFrame || _connectedClients.Count == 0) return;
             try
             {
@@ -125,18 +158,16 @@ namespace Sever
             }
             else
             {
-                isServerVideoOn = false; // Ngắt lập tức không cho thu thêm frame mới
+                isServerVideoOn = false;
                 videoSource.SignalToStop();
 
                 btnVideoServer.Text = "Bật Video Server";
                 if (picServerVideo.Image != null) { picServerVideo.Image.Dispose(); picServerVideo.Image = null; }
-                picServerVideo.Invalidate(); // Ép giao diện làm mới ngay lập tức
+                picServerVideo.Invalidate();
                 Log("Đã tắt camera Server.");
 
-                // TRÌ HOÃN 0.3 GIÂY ĐỂ FRAME CUỐI CÙNG BAY ĐI HẾT RỒI MỚI BÁO XÓA BẢNG (CHỐNG LỖI ĐƠ)
                 await Task.Delay(300);
 
-                // Gửi lệnh tắt cho toàn bộ Client
                 foreach (var clientInfo in _connectedClients)
                 {
                     if (_clientKeys.ContainsKey(clientInfo.Key))
@@ -266,6 +297,10 @@ namespace Sever
                     {
                         string decryptedMessage = _clientKeys[username].DecryptAES(receivedPacket.Payload);
                         Log($"[Chat] {username} gửi: {decryptedMessage}");
+
+                        // LƯU LỊCH SỬ TIN NHẮN TỪ CLIENT
+                        SaveChatHistory(username, decryptedMessage);
+
                         BroadcastData(username, PacketType.Message, receivedPacket.Payload);
                     }
                     else if (receivedPacket.Type == PacketType.File)
@@ -369,6 +404,9 @@ namespace Sever
             try
             {
                 Log($"[Server]: {message}");
+
+                // LƯU LỊCH SỬ TIN NHẮN SERVER GỬI ĐI
+                SaveChatHistory("Server", message);
 
                 foreach (var clientInfo in _connectedClients)
                 {
