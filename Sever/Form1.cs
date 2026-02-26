@@ -13,6 +13,7 @@ using System.Windows.Forms;
 using NAudio.Wave;
 using AForge.Video;
 using AForge.Video.DirectShow;
+using Microsoft.Data.SqlClient; // Thư viện kết nối SQL Server
 
 namespace Sever
 {
@@ -41,6 +42,9 @@ namespace Sever
         private bool isServerVideoOn = false;
         private bool isSendingFrame = false;
 
+        
+        private string connectionString = "Server=127.0.0.1,1433;Database=VideoCallDB;User Id=sa;Password=@Supanh123;Encrypt=False;TrustServerCertificate=True;";
+
         public Form1()
         {
             InitializeComponent();
@@ -48,38 +52,70 @@ namespace Sever
             this.FormClosing += Form1_FormClosing;
         }
 
-        private void SaveChatHistory(string sender, string message)
+        private void SaveChatHistory(string sender, string target, string message)
         {
             try
             {
-                string filePath = Path.Combine(Application.StartupPath, "ChatHistory_Server.txt");
-                string logLine = $"[{DateTime.Now:dd/MM/yyyy HH:mm:ss}] {sender}: {message}\r\n";
-                File.AppendAllText(filePath, logLine);
+                using (SqlConnection conn = new SqlConnection(connectionString))
+                {
+                    conn.Open();
+                    string query = "INSERT INTO ChatHistory (Sender, Target, Message, Timestamp) VALUES (@sender, @target, @message, @timestamp)";
+                    using (SqlCommand cmd = new SqlCommand(query, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@sender", sender);
+                        cmd.Parameters.AddWithValue("@target", target);
+                        cmd.Parameters.AddWithValue("@message", message);
+                        cmd.Parameters.AddWithValue("@timestamp", DateTime.Now);
+                        cmd.ExecuteNonQuery();
+                    }
+                }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Log("Lỗi lưu DB: " + ex.Message);
+            }
         }
 
         private void LoadChatHistory()
         {
             try
             {
-                string filePath = Path.Combine(Application.StartupPath, "ChatHistory_Server.txt");
-                if (File.Exists(filePath))
+                using (SqlConnection conn = new SqlConnection(connectionString))
                 {
-                    string history = File.ReadAllText(filePath);
-                    Invoke(new Action(() =>
+                    conn.Open();
+                    string query = "SELECT Sender, Target, Message, Timestamp FROM ChatHistory ORDER BY Timestamp ASC";
+                    using (SqlCommand cmd = new SqlCommand(query, conn))
                     {
-                        rtbLogs.AppendText("--- LỊCH SỬ CHAT CŨ ---\n");
-                        rtbLogs.AppendText(history);
-                        rtbLogs.AppendText("-----------------------\n");
-                    }));
+                        using (SqlDataReader reader = cmd.ExecuteReader())
+                        {
+                            Invoke(new Action(() =>
+                            {
+                                rtbLogs.AppendText("--- LỊCH SỬ CHAT TỪ SQL ---\n");
+                                while (reader.Read())
+                                {
+                                    string sender = reader["Sender"].ToString();
+                                    string target = reader["Target"].ToString();
+                                    string msg = reader["Message"].ToString();
+                                    DateTime time = Convert.ToDateTime(reader["Timestamp"]);
+
+                                    string targetText = target == "All" ? "Tất cả" : target;
+                                    rtbLogs.AppendText($"[{time:dd/MM/yyyy HH:mm:ss}] {sender} -> {targetText}: {msg}\n");
+                                }
+                                rtbLogs.AppendText("-----------------------\n");
+                            }));
+                        }
+                    }
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Log("Lỗi tải DB: " + ex.Message);
+            }
         }
 
         private void Form1_Load(object sender, EventArgs e)
         {
+            // Tải lịch sử chat từ cơ sở dữ liệu khi mở Server
             LoadChatHistory();
 
             try
@@ -202,10 +238,13 @@ namespace Sever
                     else if (receivedPacket.Type == PacketType.Message)
                     {
                         string decryptedMessage = _clientKeys[username].DecryptAES(receivedPacket.Payload);
-                        string targetText = string.IsNullOrEmpty(receivedPacket.Target) || receivedPacket.Target == "All" ? "Tất cả" : receivedPacket.Target;
+                        string targetText = string.IsNullOrEmpty(receivedPacket.Target) || receivedPacket.Target == "All" ? "All" : receivedPacket.Target;
 
-                        Log($"[Chat] {username} gửi cho {targetText}: {decryptedMessage}");
-                        SaveChatHistory(username, decryptedMessage);
+                        Log($"[Chat] {username} gửi cho {(targetText == "All" ? "Tất cả" : targetText)}: {decryptedMessage}");
+
+                        // Lưu lịch sử chat vào SQL
+                        SaveChatHistory(username, targetText, decryptedMessage);
+
                         RouteData(username, receivedPacket);
                     }
                     else if (receivedPacket.Type == PacketType.File)
@@ -321,7 +360,9 @@ namespace Sever
             try
             {
                 Log($"[Server]: {message}");
-                SaveChatHistory("Server", message);
+
+                // Lưu lịch sử Server chủ động gửi vào SQL
+                SaveChatHistory("Server", "All", message);
 
                 foreach (var clientInfo in _connectedClients)
                 {

@@ -103,7 +103,7 @@
             // 
             // btnCall
             // 
-            btnCall.Location = new Point(345, 283);
+            btnCall.Location = new Point(319, 250);
             btnCall.Name = "btnCall";
             btnCall.Size = new Size(106, 49);
             btnCall.TabIndex = 6;
@@ -113,9 +113,9 @@
             // 
             // picLocal
             // 
-            picLocal.Location = new Point(637, 304);
+            picLocal.Location = new Point(615, 304);
             picLocal.Name = "picLocal";
-            picLocal.Size = new Size(151, 134);
+            picLocal.Size = new Size(173, 134);
             picLocal.SizeMode = PictureBoxSizeMode.Zoom;
             picLocal.TabIndex = 7;
             picLocal.TabStop = false;
@@ -123,16 +123,16 @@
             // 
             // picRemote
             // 
-            picRemote.Location = new Point(345, 87);
+            picRemote.Location = new Point(319, 66);
             picRemote.Name = "picRemote";
-            picRemote.Size = new Size(344, 190);
+            picRemote.Size = new Size(316, 171);
             picRemote.SizeMode = PictureBoxSizeMode.Zoom;
             picRemote.TabIndex = 8;
             picRemote.TabStop = false;
             // 
             // btnMic
             // 
-            btnMic.Location = new Point(481, 284);
+            btnMic.Location = new Point(481, 250);
             btnMic.Name = "btnMic";
             btnMic.Size = new Size(120, 48);
             btnMic.TabIndex = 9;
