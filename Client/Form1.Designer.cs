@@ -38,20 +38,25 @@
             picLocal = new PictureBox();
             picRemote = new PictureBox();
             btnMic = new Button();
+            txtIP = new TextBox();
+            txtPassword = new TextBox();
+            label1 = new Label();
+            label2 = new Label();
+            label3 = new Label();
             ((System.ComponentModel.ISupportInitialize)picLocal).BeginInit();
             ((System.ComponentModel.ISupportInitialize)picRemote).BeginInit();
             SuspendLayout();
             // 
             // txtUsername
             // 
-            txtUsername.Location = new Point(69, 24);
+            txtUsername.Location = new Point(137, 26);
             txtUsername.Name = "txtUsername";
-            txtUsername.Size = new Size(237, 27);
+            txtUsername.Size = new Size(152, 27);
             txtUsername.TabIndex = 0;
             // 
             // btnConnect
             // 
-            btnConnect.Location = new Point(44, 357);
+            btnConnect.Location = new Point(294, 360);
             btnConnect.Name = "btnConnect";
             btnConnect.Size = new Size(184, 60);
             btnConnect.TabIndex = 1;
@@ -61,7 +66,7 @@
             // 
             // rtbClientLogs
             // 
-            rtbClientLogs.Location = new Point(29, 87);
+            rtbClientLogs.Location = new Point(12, 166);
             rtbClientLogs.Name = "rtbClientLogs";
             rtbClientLogs.ReadOnly = true;
             rtbClientLogs.Size = new Size(277, 166);
@@ -70,14 +75,14 @@
             // 
             // txtMessage
             // 
-            txtMessage.Location = new Point(29, 284);
+            txtMessage.Location = new Point(12, 338);
             txtMessage.Name = "txtMessage";
             txtMessage.Size = new Size(199, 27);
             txtMessage.TabIndex = 3;
             // 
             // btnSend
             // 
-            btnSend.Location = new Point(163, 315);
+            btnSend.Location = new Point(151, 371);
             btnSend.Name = "btnSend";
             btnSend.Size = new Size(65, 36);
             btnSend.TabIndex = 4;
@@ -87,7 +92,7 @@
             // 
             // btnSendFile
             // 
-            btnSendFile.Location = new Point(29, 317);
+            btnSendFile.Location = new Point(12, 373);
             btnSendFile.Name = "btnSendFile";
             btnSendFile.Size = new Size(103, 34);
             btnSendFile.TabIndex = 5;
@@ -134,11 +139,59 @@
             btnMic.UseVisualStyleBackColor = true;
             btnMic.Click += btnMic_Click_1;
             // 
+            // txtIP
+            // 
+            txtIP.Location = new Point(137, 59);
+            txtIP.Name = "txtIP";
+            txtIP.Size = new Size(152, 27);
+            txtIP.TabIndex = 10;
+            txtIP.Text = "127.0.0.1";
+            // 
+            // txtPassword
+            // 
+            txtPassword.Location = new Point(137, 101);
+            txtPassword.Name = "txtPassword";
+            txtPassword.PasswordChar = '*';
+            txtPassword.Size = new Size(152, 27);
+            txtPassword.TabIndex = 11;
+            // 
+            // label1
+            // 
+            label1.AutoSize = true;
+            label1.Location = new Point(19, 33);
+            label1.Name = "label1";
+            label1.Size = new Size(112, 20);
+            label1.TabIndex = 12;
+            label1.Text = "Tên Đăng Nhập";
+            // 
+            // label2
+            // 
+            label2.AutoSize = true;
+            label2.Location = new Point(65, 66);
+            label2.Name = "label2";
+            label2.Size = new Size(66, 20);
+            label2.TabIndex = 13;
+            label2.Text = "IP Server";
+            // 
+            // label3
+            // 
+            label3.AutoSize = true;
+            label3.Location = new Point(59, 108);
+            label3.Name = "label3";
+            label3.Size = new Size(72, 20);
+            label3.TabIndex = 14;
+            label3.Text = "Mật Khẩu";
+            // 
             // Form1
             // 
             AutoScaleDimensions = new SizeF(8F, 20F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(800, 450);
+            Controls.Add(label3);
+            Controls.Add(label2);
+            Controls.Add(label1);
+            Controls.Add(txtPassword);
+            Controls.Add(txtIP);
             Controls.Add(btnMic);
             Controls.Add(picRemote);
             Controls.Add(picLocal);
@@ -171,5 +224,10 @@
         private PictureBox picLocal;
         private PictureBox picRemote;
         private Button btnMic;
+        private TextBox txtIP;
+        private TextBox txtPassword;
+        private Label label1;
+        private Label label2;
+        private Label label3;
     }
 }

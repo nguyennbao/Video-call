@@ -1,6 +1,7 @@
 using SharedCore;
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
@@ -23,6 +24,14 @@ namespace Sever
         private ConcurrentDictionary<string, StreamWriter> _connectedClients = new ConcurrentDictionary<string, StreamWriter>();
         private ConcurrentDictionary<string, CryptoService> _clientKeys = new ConcurrentDictionary<string, CryptoService>();
 
+        // TẠO DANH SÁCH TÀI KHOẢN HỢP LỆ CHO SERVER (Bạn có thể thêm bớt ở đây)
+        private Dictionary<string, string> _validAccounts = new Dictionary<string, string>()
+        {
+            { "admin", "admin123" },
+            { "bao", "123456" },
+            { "test", "1111" }
+        };
+
         // Âm thanh
         private WaveInEvent _waveIn;
         private WaveOutEvent _waveOut;
@@ -42,7 +51,6 @@ namespace Sever
             this.FormClosing += Form1_FormClosing;
         }
 
-        // ---------------- THÊM HÀM LƯU/TẢI LỊCH SỬ CHAT ----------------
         private void SaveChatHistory(string sender, string message)
         {
             try
@@ -62,7 +70,8 @@ namespace Sever
                 if (File.Exists(filePath))
                 {
                     string history = File.ReadAllText(filePath);
-                    Invoke(new Action(() => {
+                    Invoke(new Action(() =>
+                    {
                         rtbLogs.AppendText("--- LỊCH SỬ CHAT CŨ ---\n");
                         rtbLogs.AppendText(history);
                         rtbLogs.AppendText("-----------------------\n");
@@ -71,14 +80,11 @@ namespace Sever
             }
             catch { }
         }
-        // -----------------------------------------------------------------
 
         private void Form1_Load(object sender, EventArgs e)
         {
-            // Tải lịch sử chat khi mở Server
             LoadChatHistory();
 
-            // Cài đặt Camera
             try
             {
                 videoDevices = new FilterInfoCollection(FilterCategory.VideoInputDevice);
@@ -90,7 +96,6 @@ namespace Sever
             }
             catch { Log("Không tìm thấy thiết bị Camera trên Server."); }
 
-            // Cài đặt Mic
             try
             {
                 _waveIn = new WaveInEvent();
@@ -106,6 +111,212 @@ namespace Sever
             catch { Log("Không tìm thấy thiết bị Âm thanh trên Server."); }
         }
 
+        private async void btnStart_Click_1(object sender, EventArgs e)
+        {
+            if (!_isRunning)
+            {
+                btnStart.Enabled = false;
+                await StartServer();
+            }
+        }
+
+        private async Task StartServer()
+        {
+            try
+            {
+                _server = new TcpListener(IPAddress.Any, 8888);
+                _server.Start();
+                _isRunning = true;
+                Log("Server đã khởi động ở cổng 8888. Đang chờ Client kết nối...");
+
+                while (_isRunning)
+                {
+                    TcpClient client = await _server.AcceptTcpClientAsync();
+                    Log($"[+] Có Client kết nối từ: {client.Client.RemoteEndPoint}");
+                    _ = Task.Run(() => HandleClient(client));
+                }
+            }
+            catch (Exception ex) { Log($"Lỗi Server: {ex.Message}"); }
+        }
+
+        private async void HandleClient(TcpClient client)
+        {
+            string username = "";
+            try
+            {
+                var stream = client.GetStream();
+                var reader = new StreamReader(stream);
+                var writer = new StreamWriter(stream) { AutoFlush = true };
+
+                while (true)
+                {
+                    string clientData = await reader.ReadLineAsync();
+                    if (clientData == null) break;
+
+                    Packet receivedPacket = JsonSerializer.Deserialize<Packet>(clientData);
+
+                    // XỬ LÝ ĐĂNG NHẬP
+                    if (receivedPacket.Type == PacketType.Login)
+                    {
+                        LoginDTO loginInfo = JsonSerializer.Deserialize<LoginDTO>(receivedPacket.Content);
+
+                        // Kiểm tra Username và Password có trong từ điển không
+                        if (_validAccounts.ContainsKey(loginInfo.Username) && _validAccounts[loginInfo.Username] == loginInfo.Password)
+                        {
+                            username = loginInfo.Username;
+                            Log($"[+] User '{username}' đăng nhập thành công!");
+
+                            _connectedClients[username] = writer;
+
+                            // 1. Phản hồi thành công để Client mở giao diện
+                            var successPacket = new Packet { Type = PacketType.LoginResponse, Sender = "Server", Content = "SUCCESS" };
+                            await writer.WriteLineAsync(JsonSerializer.Serialize(successPacket));
+
+                            // 2. Gửi khóa bảo mật
+                            var crypto = new CryptoService();
+                            _clientKeys[username] = crypto;
+                            var keyPacket = new Packet { Type = PacketType.KeyExchange, Sender = "Server", Payload = crypto.PublicKey };
+                            await writer.WriteLineAsync(JsonSerializer.Serialize(keyPacket));
+                        }
+                        else
+                        {
+                            Log($"[-] User '{loginInfo.Username}' cố đăng nhập nhưng sai tài khoản/mật khẩu.");
+                            // Phản hồi lỗi
+                            var failPacket = new Packet { Type = PacketType.LoginResponse, Sender = "Server", Content = "FAIL" };
+                            await writer.WriteLineAsync(JsonSerializer.Serialize(failPacket));
+                            client.Close();
+                            return;
+                        }
+                    }
+                    else if (receivedPacket.Type == PacketType.KeyExchange)
+                    {
+                        _clientKeys[username].DeriveSharedSecret(receivedPacket.Payload);
+                        Log($"[+] Đã thiết lập khóa bảo mật an toàn với '{username}'.");
+                    }
+                    else if (receivedPacket.Type == PacketType.Message)
+                    {
+                        string decryptedMessage = _clientKeys[username].DecryptAES(receivedPacket.Payload);
+                        Log($"[Chat] {username} gửi: {decryptedMessage}");
+                        SaveChatHistory(username, decryptedMessage);
+                        BroadcastData(username, PacketType.Message, receivedPacket.Payload);
+                    }
+                    else if (receivedPacket.Type == PacketType.File)
+                    {
+                        try
+                        {
+                            string decryptedBase64 = _clientKeys[username].DecryptAES(receivedPacket.Payload);
+                            byte[] fileBytes = Convert.FromBase64String(decryptedBase64);
+                            string fileName = receivedPacket.Content;
+
+                            string savePath = Path.Combine(Application.StartupPath, "ServerReceivedFiles");
+                            if (!Directory.Exists(savePath)) Directory.CreateDirectory(savePath);
+
+                            string fullPath = Path.Combine(savePath, $"{username}_{fileName}");
+                            File.WriteAllBytes(fullPath, fileBytes);
+                            Log($"[Hệ thống] {username} vừa gửi file: {fileName}");
+
+                            BroadcastData(username, PacketType.File, receivedPacket.Payload, receivedPacket.Content);
+                        }
+                        catch { }
+                    }
+                    else if (receivedPacket.Type == PacketType.VideoFrame)
+                    {
+                        if (receivedPacket.Content == "STOP_VIDEO")
+                        {
+                            this.Invoke(new Action(() =>
+                            {
+                                if (picClientVideo.Image != null) { picClientVideo.Image.Dispose(); picClientVideo.Image = null; }
+                                picClientVideo.Invalidate();
+                            }));
+                            BroadcastData(username, PacketType.VideoFrame, receivedPacket.Payload, "STOP_VIDEO");
+                        }
+                        else
+                        {
+                            string decryptedBase64 = _clientKeys[username].DecryptAES(receivedPacket.Payload);
+                            try
+                            {
+                                byte[] imageBytes = Convert.FromBase64String(decryptedBase64);
+                                using (MemoryStream ms = new MemoryStream(imageBytes))
+                                using (Image img = Image.FromStream(ms))
+                                {
+                                    Bitmap bitmapToDisplay = new Bitmap(img);
+                                    this.Invoke(new Action(() =>
+                                    {
+                                        if (picClientVideo.Image != null) picClientVideo.Image.Dispose();
+                                        picClientVideo.Image = bitmapToDisplay;
+                                    }));
+                                }
+                            }
+                            catch { }
+                            BroadcastData(username, PacketType.VideoFrame, receivedPacket.Payload);
+                        }
+                    }
+                    else if (receivedPacket.Type == PacketType.AudioFrame)
+                    {
+                        string decryptedBase64 = _clientKeys[username].DecryptAES(receivedPacket.Payload);
+                        byte[] audioBytes = Convert.FromBase64String(decryptedBase64);
+
+                        if (_waveProvider != null)
+                        {
+                            _waveProvider.AddSamples(audioBytes, 0, audioBytes.Length);
+                        }
+
+                        BroadcastData(username, PacketType.AudioFrame, receivedPacket.Payload);
+                    }
+                }
+            }
+            catch { }
+            finally
+            {
+                if (!string.IsNullOrEmpty(username))
+                {
+                    _connectedClients.TryRemove(username, out _);
+                    _clientKeys.TryRemove(username, out _);
+                    Log($"[-] Client '{username}' đã ngắt kết nối.");
+                }
+                client.Close();
+            }
+        }
+
+        private async void BroadcastData(string senderUsername, PacketType type, byte[] originalPayload, string content = null)
+        {
+            string decryptedBase64 = _clientKeys[senderUsername].DecryptAES(originalPayload);
+
+            foreach (var targetClient in _connectedClients)
+            {
+                if (targetClient.Key != senderUsername)
+                {
+                    byte[] reEncrypted = _clientKeys[targetClient.Key].EncryptAES(decryptedBase64);
+                    var forwardPacket = new Packet { Type = type, Sender = senderUsername, Payload = reEncrypted, Content = content };
+                    await targetClient.Value.WriteLineAsync(JsonSerializer.Serialize(forwardPacket));
+                }
+            }
+        }
+
+        private async void btnSend_Click(object sender, EventArgs e)
+        {
+            string message = txtMessage.Text;
+            if (string.IsNullOrWhiteSpace(message) || _connectedClients.Count == 0) return;
+            try
+            {
+                Log($"[Server]: {message}");
+                SaveChatHistory("Server", message);
+
+                foreach (var clientInfo in _connectedClients)
+                {
+                    if (_clientKeys.ContainsKey(clientInfo.Key))
+                    {
+                        byte[] encryptedMessage = _clientKeys[clientInfo.Key].EncryptAES(message);
+                        var packet = new Packet { Type = PacketType.Message, Sender = "Server", Payload = encryptedMessage };
+                        await clientInfo.Value.WriteLineAsync(JsonSerializer.Serialize(packet));
+                    }
+                }
+                txtMessage.Clear();
+            }
+            catch { }
+        }
+
+        // --- CAMERA VÀ MIC SERVER (GIỮ NGUYÊN) ---
         private async void videoSource_NewFrame(object sender, NewFrameEventArgs eventArgs)
         {
             if (!isServerVideoOn || isSendingFrame || _connectedClients.Count == 0) return;
@@ -114,7 +325,8 @@ namespace Sever
                 isSendingFrame = true;
                 Bitmap frame = (Bitmap)eventArgs.Frame.Clone();
 
-                picServerVideo.Invoke(new Action(() => {
+                picServerVideo.Invoke(new Action(() =>
+                {
                     if (picServerVideo.Image != null) picServerVideo.Image.Dispose();
                     picServerVideo.Image = (Bitmap)frame.Clone();
                 }));
@@ -225,203 +437,6 @@ namespace Sever
             }
         }
 
-        private async void btnStart_Click_1(object sender, EventArgs e)
-        {
-            if (!_isRunning)
-            {
-                btnStart.Enabled = false;
-                await StartServer();
-            }
-        }
-
-        private async Task StartServer()
-        {
-            try
-            {
-                _server = new TcpListener(IPAddress.Any, 8888);
-                _server.Start();
-                _isRunning = true;
-                Log("Server đã khởi động ở cổng 8888. Đang chờ Client kết nối...");
-
-                while (_isRunning)
-                {
-                    TcpClient client = await _server.AcceptTcpClientAsync();
-                    Log($"[+] Có Client kết nối từ: {client.Client.RemoteEndPoint}");
-                    _ = Task.Run(() => HandleClient(client));
-                }
-            }
-            catch (Exception ex) { Log($"Lỗi Server: {ex.Message}"); }
-        }
-
-        private async void HandleClient(TcpClient client)
-        {
-            string username = "";
-            try
-            {
-                var stream = client.GetStream();
-                var reader = new StreamReader(stream);
-                var writer = new StreamWriter(stream) { AutoFlush = true };
-
-                while (true)
-                {
-                    string clientData = await reader.ReadLineAsync();
-                    if (clientData == null) break;
-
-                    Packet receivedPacket = JsonSerializer.Deserialize<Packet>(clientData);
-
-                    if (receivedPacket.Type == PacketType.Login)
-                    {
-                        LoginDTO loginInfo = JsonSerializer.Deserialize<LoginDTO>(receivedPacket.Content);
-                        if (loginInfo.Password == "123")
-                        {
-                            username = loginInfo.Username;
-                            Log($"[+] User '{username}' chứng thực thành công!");
-                            _connectedClients[username] = writer;
-                            var crypto = new CryptoService();
-                            _clientKeys[username] = crypto;
-                            var keyPacket = new Packet { Type = PacketType.KeyExchange, Sender = "Server", Payload = crypto.PublicKey };
-                            await writer.WriteLineAsync(JsonSerializer.Serialize(keyPacket));
-                        }
-                        else
-                        {
-                            client.Close();
-                            return;
-                        }
-                    }
-                    else if (receivedPacket.Type == PacketType.KeyExchange)
-                    {
-                        _clientKeys[username].DeriveSharedSecret(receivedPacket.Payload);
-                        Log($"[+] Đã thiết lập khóa bảo mật an toàn với '{username}'.");
-                    }
-                    else if (receivedPacket.Type == PacketType.Message)
-                    {
-                        string decryptedMessage = _clientKeys[username].DecryptAES(receivedPacket.Payload);
-                        Log($"[Chat] {username} gửi: {decryptedMessage}");
-
-                        // LƯU LỊCH SỬ TIN NHẮN TỪ CLIENT
-                        SaveChatHistory(username, decryptedMessage);
-
-                        BroadcastData(username, PacketType.Message, receivedPacket.Payload);
-                    }
-                    else if (receivedPacket.Type == PacketType.File)
-                    {
-                        try
-                        {
-                            string decryptedBase64 = _clientKeys[username].DecryptAES(receivedPacket.Payload);
-                            byte[] fileBytes = Convert.FromBase64String(decryptedBase64);
-                            string fileName = receivedPacket.Content;
-
-                            string savePath = Path.Combine(Application.StartupPath, "ServerReceivedFiles");
-                            if (!Directory.Exists(savePath))
-                            {
-                                Directory.CreateDirectory(savePath);
-                            }
-
-                            string fullPath = Path.Combine(savePath, $"{username}_{fileName}");
-                            File.WriteAllBytes(fullPath, fileBytes);
-                            Log($"[Hệ thống] {username} vừa gửi file: {fileName}");
-
-                            BroadcastData(username, PacketType.File, receivedPacket.Payload, receivedPacket.Content);
-                        }
-                        catch { }
-                    }
-                    else if (receivedPacket.Type == PacketType.VideoFrame)
-                    {
-                        if (receivedPacket.Content == "STOP_VIDEO")
-                        {
-                            this.Invoke(new Action(() => {
-                                if (picClientVideo.Image != null) { picClientVideo.Image.Dispose(); picClientVideo.Image = null; }
-                                picClientVideo.Invalidate();
-                            }));
-                            BroadcastData(username, PacketType.VideoFrame, receivedPacket.Payload, "STOP_VIDEO");
-                        }
-                        else
-                        {
-                            string decryptedBase64 = _clientKeys[username].DecryptAES(receivedPacket.Payload);
-                            try
-                            {
-                                byte[] imageBytes = Convert.FromBase64String(decryptedBase64);
-                                using (MemoryStream ms = new MemoryStream(imageBytes))
-                                using (Image img = Image.FromStream(ms))
-                                {
-                                    Bitmap bitmapToDisplay = new Bitmap(img);
-                                    this.Invoke(new Action(() => {
-                                        if (picClientVideo.Image != null) picClientVideo.Image.Dispose();
-                                        picClientVideo.Image = bitmapToDisplay;
-                                    }));
-                                }
-                            }
-                            catch { }
-                            BroadcastData(username, PacketType.VideoFrame, receivedPacket.Payload);
-                        }
-                    }
-                    else if (receivedPacket.Type == PacketType.AudioFrame)
-                    {
-                        string decryptedBase64 = _clientKeys[username].DecryptAES(receivedPacket.Payload);
-                        byte[] audioBytes = Convert.FromBase64String(decryptedBase64);
-
-                        if (_waveProvider != null)
-                        {
-                            _waveProvider.AddSamples(audioBytes, 0, audioBytes.Length);
-                        }
-
-                        BroadcastData(username, PacketType.AudioFrame, receivedPacket.Payload);
-                    }
-                }
-            }
-            catch { }
-            finally
-            {
-                if (!string.IsNullOrEmpty(username))
-                {
-                    _connectedClients.TryRemove(username, out _);
-                    _clientKeys.TryRemove(username, out _);
-                    Log($"[-] Client '{username}' đã ngắt kết nối.");
-                }
-                client.Close();
-            }
-        }
-
-        private async void BroadcastData(string senderUsername, PacketType type, byte[] originalPayload, string content = null)
-        {
-            string decryptedBase64 = _clientKeys[senderUsername].DecryptAES(originalPayload);
-
-            foreach (var targetClient in _connectedClients)
-            {
-                if (targetClient.Key != senderUsername)
-                {
-                    byte[] reEncrypted = _clientKeys[targetClient.Key].EncryptAES(decryptedBase64);
-                    var forwardPacket = new Packet { Type = type, Sender = senderUsername, Payload = reEncrypted, Content = content };
-                    await targetClient.Value.WriteLineAsync(JsonSerializer.Serialize(forwardPacket));
-                }
-            }
-        }
-
-        private async void btnSend_Click(object sender, EventArgs e)
-        {
-            string message = txtMessage.Text;
-            if (string.IsNullOrWhiteSpace(message) || _connectedClients.Count == 0) return;
-            try
-            {
-                Log($"[Server]: {message}");
-
-                // LƯU LỊCH SỬ TIN NHẮN SERVER GỬI ĐI
-                SaveChatHistory("Server", message);
-
-                foreach (var clientInfo in _connectedClients)
-                {
-                    if (_clientKeys.ContainsKey(clientInfo.Key))
-                    {
-                        byte[] encryptedMessage = _clientKeys[clientInfo.Key].EncryptAES(message);
-                        var packet = new Packet { Type = PacketType.Message, Sender = "Server", Payload = encryptedMessage };
-                        await clientInfo.Value.WriteLineAsync(JsonSerializer.Serialize(packet));
-                    }
-                }
-                txtMessage.Clear();
-            }
-            catch { }
-        }
-
         private void Form1_FormClosing(object sender, FormClosingEventArgs e)
         {
             if (videoSource != null && videoSource.IsRunning) { videoSource.SignalToStop(); videoSource.WaitForStop(); }
@@ -433,6 +448,11 @@ namespace Sever
         {
             if (rtbLogs.InvokeRequired) rtbLogs.Invoke(new Action(() => Log(message)));
             else rtbLogs.AppendText($"{DateTime.Now:HH:mm:ss} - {message}\r\n");
+        }
+
+        private void txtMessage_TextChanged(object sender, EventArgs e)
+        {
+
         }
     }
 }

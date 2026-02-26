@@ -36,13 +36,14 @@
             btnMic = new Button();
             btnVideoServer = new Button();
             picClientVideo = new PictureBox();
+            label4 = new Label();
             ((System.ComponentModel.ISupportInitialize)picServerVideo).BeginInit();
             ((System.ComponentModel.ISupportInitialize)picClientVideo).BeginInit();
             SuspendLayout();
             // 
             // btnStart
             // 
-            btnStart.Location = new Point(87, 312);
+            btnStart.Location = new Point(21, 322);
             btnStart.Name = "btnStart";
             btnStart.Size = new Size(230, 68);
             btnStart.TabIndex = 0;
@@ -61,7 +62,7 @@
             // 
             // btnSend
             // 
-            btnSend.Location = new Point(257, 236);
+            btnSend.Location = new Point(269, 236);
             btnSend.Name = "btnSend";
             btnSend.Size = new Size(123, 44);
             btnSend.TabIndex = 2;
@@ -71,10 +72,11 @@
             // 
             // txtMessage
             // 
-            txtMessage.Location = new Point(21, 245);
+            txtMessage.Location = new Point(52, 245);
             txtMessage.Name = "txtMessage";
             txtMessage.Size = new Size(211, 27);
             txtMessage.TabIndex = 3;
+            txtMessage.TextChanged += txtMessage_TextChanged;
             // 
             // picServerVideo
             // 
@@ -87,9 +89,9 @@
             // 
             // btnMic
             // 
-            btnMic.Location = new Point(441, 366);
+            btnMic.Location = new Point(423, 332);
             btnMic.Name = "btnMic";
-            btnMic.Size = new Size(111, 29);
+            btnMic.Size = new Size(111, 52);
             btnMic.TabIndex = 10;
             btnMic.Text = "Bật/Tắt Mic";
             btnMic.UseVisualStyleBackColor = true;
@@ -97,9 +99,9 @@
             // 
             // btnVideoServer
             // 
-            btnVideoServer.Location = new Point(441, 312);
+            btnVideoServer.Location = new Point(269, 332);
             btnVideoServer.Name = "btnVideoServer";
-            btnVideoServer.Size = new Size(111, 29);
+            btnVideoServer.Size = new Size(111, 48);
             btnVideoServer.TabIndex = 11;
             btnVideoServer.Text = "Bật Video";
             btnVideoServer.UseVisualStyleBackColor = true;
@@ -114,11 +116,21 @@
             picClientVideo.TabIndex = 12;
             picClientVideo.TabStop = false;
             // 
+            // label4
+            // 
+            label4.AutoSize = true;
+            label4.Location = new Point(7, 248);
+            label4.Name = "label4";
+            label4.Size = new Size(39, 20);
+            label4.TabIndex = 16;
+            label4.Text = "Chat";
+            // 
             // Form1
             // 
             AutoScaleDimensions = new SizeF(8F, 20F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(800, 450);
+            Controls.Add(label4);
             Controls.Add(picClientVideo);
             Controls.Add(btnVideoServer);
             Controls.Add(btnMic);
@@ -145,5 +157,6 @@
         private Button btnMic;
         private Button btnVideoServer;
         private PictureBox picClientVideo;
+        private Label label4;
     }
 }
