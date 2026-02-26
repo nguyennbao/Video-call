@@ -43,6 +43,7 @@
             label1 = new Label();
             label2 = new Label();
             label3 = new Label();
+            label4 = new Label();
             ((System.ComponentModel.ISupportInitialize)picLocal).BeginInit();
             ((System.ComponentModel.ISupportInitialize)picRemote).BeginInit();
             SuspendLayout();
@@ -75,7 +76,7 @@
             // 
             // txtMessage
             // 
-            txtMessage.Location = new Point(12, 338);
+            txtMessage.Location = new Point(59, 338);
             txtMessage.Name = "txtMessage";
             txtMessage.Size = new Size(199, 27);
             txtMessage.TabIndex = 3;
@@ -104,7 +105,7 @@
             // 
             btnCall.Location = new Point(345, 283);
             btnCall.Name = "btnCall";
-            btnCall.Size = new Size(94, 29);
+            btnCall.Size = new Size(106, 49);
             btnCall.TabIndex = 6;
             btnCall.Text = "Bật Video";
             btnCall.UseVisualStyleBackColor = true;
@@ -133,7 +134,7 @@
             // 
             btnMic.Location = new Point(481, 284);
             btnMic.Name = "btnMic";
-            btnMic.Size = new Size(111, 29);
+            btnMic.Size = new Size(120, 48);
             btnMic.TabIndex = 9;
             btnMic.Text = "Bật Mic";
             btnMic.UseVisualStyleBackColor = true;
@@ -182,11 +183,21 @@
             label3.TabIndex = 14;
             label3.Text = "Mật Khẩu";
             // 
+            // label4
+            // 
+            label4.AutoSize = true;
+            label4.Location = new Point(12, 345);
+            label4.Name = "label4";
+            label4.Size = new Size(39, 20);
+            label4.TabIndex = 15;
+            label4.Text = "Chat";
+            // 
             // Form1
             // 
             AutoScaleDimensions = new SizeF(8F, 20F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(800, 450);
+            Controls.Add(label4);
             Controls.Add(label3);
             Controls.Add(label2);
             Controls.Add(label1);
@@ -229,5 +240,6 @@
         private Label label1;
         private Label label2;
         private Label label3;
+        private Label label4;
     }
 }

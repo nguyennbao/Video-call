@@ -99,7 +99,7 @@
             // 
             // btnVideoServer
             // 
-            btnVideoServer.Location = new Point(269, 332);
+            btnVideoServer.Location = new Point(281, 332);
             btnVideoServer.Name = "btnVideoServer";
             btnVideoServer.Size = new Size(111, 48);
             btnVideoServer.TabIndex = 11;

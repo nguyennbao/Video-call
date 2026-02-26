@@ -1,5 +1,6 @@
 using SharedCore;
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
@@ -32,6 +33,11 @@ namespace Client
 
         private DateTime callStartTime;
 
+        // --- CÁC BIẾN CHO CHAT RIÊNG ---
+        private string _currentTarget = "All";
+        private ComboBox cmbUsers;
+        private Label lblTarget;
+
         public Form1()
         {
             InitializeComponent();
@@ -39,10 +45,25 @@ namespace Client
             this.FormClosing += Form1_FormClosing;
         }
 
-        // --- HÀM ẨN HIỆN GIAO DIỆN ---
+        private void SetupPrivateChatUI()
+        {
+            // Tự động tạo Label và ComboBox chọn người nhận mà không cần kéo thả
+            lblTarget = new Label() { Text = "Gửi tới:", Location = new Point(345, 338), AutoSize = true, Visible = false };
+            cmbUsers = new ComboBox() { Location = new Point(410, 335), Size = new Size(130, 28), DropDownStyle = ComboBoxStyle.DropDownList, Visible = false };
+            cmbUsers.Items.Add("All");
+            cmbUsers.SelectedIndex = 0;
+
+            cmbUsers.SelectedIndexChanged += (s, e) => {
+                _currentTarget = cmbUsers.SelectedItem?.ToString() ?? "All";
+                Log($"=> Đã chuyển chế độ gửi sang: {_currentTarget}");
+            };
+
+            this.Controls.Add(lblTarget);
+            this.Controls.Add(cmbUsers);
+        }
+
         private void ToggleUI(bool isLoggedIn)
         {
-            // Ẩn/Hiện các chức năng sau khi đăng nhập
             rtbClientLogs.Visible = isLoggedIn;
             txtMessage.Visible = isLoggedIn;
             btnSend.Visible = isLoggedIn;
@@ -52,20 +73,22 @@ namespace Client
             picLocal.Visible = isLoggedIn;
             picRemote.Visible = isLoggedIn;
 
-            // Ẩn/Hiện khung đăng nhập
+            // Hiện chức năng chat riêng
+            if (lblTarget != null) lblTarget.Visible = isLoggedIn;
+            if (cmbUsers != null) cmbUsers.Visible = isLoggedIn;
+
             txtUsername.Enabled = !isLoggedIn;
             txtPassword.Enabled = !isLoggedIn;
             txtIP.Enabled = !isLoggedIn;
             btnConnect.Visible = !isLoggedIn;
         }
 
-        // --- LƯU VÀ TẢI LỊCH SỬ CHAT ---
         private void SaveChatHistory(string sender, string message)
         {
             try
             {
                 string filePath = Path.Combine(Application.StartupPath, "ChatHistory_Client.txt");
-                string logLine = $"[{DateTime.Now:dd/MM/yyyy HH:mm:ss}] {sender}: {message}\r\n";
+                string logLine = $"[{DateTime.Now:dd/MM/yyyy HH:mm:ss}] {sender} -> {_currentTarget}: {message}\r\n";
                 File.AppendAllText(filePath, logLine);
             }
             catch { }
@@ -91,10 +114,9 @@ namespace Client
 
         private void Form1_Load(object sender, EventArgs e)
         {
-            // 1. Mới mở lên là giấu hết tính năng, chỉ để lại đăng nhập
+            SetupPrivateChatUI(); // Tạo UI chat riêng
             ToggleUI(false);
 
-            // 2. Cài đặt Camera
             videoDevices = new FilterInfoCollection(FilterCategory.VideoInputDevice);
             if (videoDevices.Count > 0)
             {
@@ -102,7 +124,6 @@ namespace Client
                 videoSource.NewFrame += new NewFrameEventHandler(videoSource_NewFrame);
             }
 
-            // 3. Cài đặt Mic
             try
             {
                 _waveIn = new WaveInEvent();
@@ -120,7 +141,6 @@ namespace Client
 
         private async void btnConnect_Click(object sender, EventArgs e)
         {
-            // Kiểm tra xem đã nhập đủ IP, Tên và Mật khẩu chưa
             if (string.IsNullOrWhiteSpace(txtIP.Text) || string.IsNullOrWhiteSpace(txtUsername.Text) || string.IsNullOrWhiteSpace(txtPassword.Text))
             {
                 MessageBox.Show("Vui lòng nhập IP Server, Tên đăng nhập và Mật khẩu!", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -131,14 +151,12 @@ namespace Client
             {
                 btnConnect.Enabled = false;
                 _client = new TcpClient();
-                // Kết nối tới IP người dùng nhập (Cổng 8888)
                 await _client.ConnectAsync(txtIP.Text, 8888);
 
                 var stream = _client.GetStream();
                 _writer = new StreamWriter(stream) { AutoFlush = true };
                 _reader = new StreamReader(stream);
 
-                // Gửi gói tin đăng nhập
                 var loginData = new LoginDTO { Username = txtUsername.Text, Password = txtPassword.Text };
                 var packet = new Packet { Type = PacketType.Login, Sender = txtUsername.Text, Content = JsonSerializer.Serialize(loginData) };
                 await _writer.WriteLineAsync(JsonSerializer.Serialize(packet));
@@ -162,14 +180,13 @@ namespace Client
                     if (data == null) break;
                     var packet = JsonSerializer.Deserialize<Packet>(data);
 
-                    // XỬ LÝ KẾT QUẢ ĐĂNG NHẬP
                     if (packet.Type == PacketType.LoginResponse)
                     {
                         if (packet.Content == "SUCCESS")
                         {
                             Invoke(new Action(() => {
-                                ToggleUI(true); // Đăng nhập đúng thì hiện giao diện lên
-                                LoadChatHistory(); // Load lịch sử chat cũ
+                                ToggleUI(true);
+                                LoadChatHistory();
                                 Log("Đăng nhập thành công! Bắt đầu kết nối bảo mật...");
                             }));
                         }
@@ -180,7 +197,7 @@ namespace Client
                                 btnConnect.Enabled = true;
                             }));
                             _client.Close();
-                            return; // Thoát lắng nghe
+                            return;
                         }
                     }
                     else if (packet.Type == PacketType.KeyExchange)
@@ -191,10 +208,33 @@ namespace Client
                         await _writer.WriteLineAsync(JsonSerializer.Serialize(response));
                         Log("Bảo mật AES đã sẵn sàng!");
                     }
+                    // --- NHẬN DANH SÁCH USER TỪ SERVER ĐỂ CẬP NHẬT COMBOBOX ---
+                    else if (packet.Type == PacketType.UserList)
+                    {
+                        var users = JsonSerializer.Deserialize<List<string>>(packet.Content);
+                        Invoke(new Action(() => {
+                            if (cmbUsers != null)
+                            {
+                                string currentSelection = cmbUsers.SelectedItem?.ToString();
+                                cmbUsers.Items.Clear();
+                                cmbUsers.Items.Add("All");
+                                foreach (var u in users)
+                                {
+                                    if (u != txtUsername.Text) cmbUsers.Items.Add(u);
+                                }
+
+                                if (currentSelection != null && cmbUsers.Items.Contains(currentSelection))
+                                    cmbUsers.SelectedItem = currentSelection;
+                                else
+                                    cmbUsers.SelectedIndex = 0;
+                            }
+                        }));
+                    }
                     else if (packet.Type == PacketType.Message)
                     {
                         string msg = _crypto.DecryptAES(packet.Payload);
-                        Log($"[{packet.Sender}]: {msg}");
+                        string privateTag = (packet.Target == txtUsername.Text) ? " [Riêng tư]" : "";
+                        Log($"[{packet.Sender}]{privateTag}: {msg}");
                         SaveChatHistory(packet.Sender, msg);
                     }
                     else if (packet.Type == PacketType.VideoFrame)
@@ -247,7 +287,8 @@ namespace Client
                             string fullPath = Path.Combine(savePath, $"{packet.Sender}_{fileName}");
                             File.WriteAllBytes(fullPath, fileBytes);
 
-                            Log($"[{packet.Sender}] đã gửi một file: {fileName}");
+                            string privateTag = (packet.Target == txtUsername.Text) ? " [File Riêng Tư]" : "";
+                            Log($"[{packet.Sender}]{privateTag} đã gửi một file: {fileName}");
                         }
                         catch { }
                     }
@@ -256,7 +297,6 @@ namespace Client
             catch { Log("Mất kết nối với Server."); }
         }
 
-        // --- CÁC NÚT BẤM CHỨC NĂNG (GIỮ NGUYÊN NHƯ CŨ) ---
         private async void WaveIn_DataAvailable(object sender, WaveInEventArgs e)
         {
             if (!_isMicOn || _crypto == null || _writer == null) return;
@@ -267,7 +307,7 @@ namespace Client
                 string base64 = Convert.ToBase64String(audioData);
                 byte[] encrypted = _crypto.EncryptAES(base64);
 
-                var packet = new Packet { Type = PacketType.AudioFrame, Sender = txtUsername.Text, Payload = encrypted };
+                var packet = new Packet { Type = PacketType.AudioFrame, Sender = txtUsername.Text, Target = _currentTarget, Payload = encrypted };
                 await _writer.WriteLineAsync(JsonSerializer.Serialize(packet));
             }
             catch { }
@@ -281,7 +321,7 @@ namespace Client
                 _waveIn.StartRecording();
                 _isMicOn = true;
                 btnMic.Text = "Tắt Mic";
-                Log("Đã bật Mic.");
+                Log($"Đã bật Mic (Đang phát cho: {_currentTarget}).");
             }
             else
             {
@@ -301,7 +341,7 @@ namespace Client
                 videoSource.Start();
                 btnCall.Text = "Tắt Gọi Video";
                 callStartTime = DateTime.Now;
-                Log("Đã bật camera.");
+                Log($"Đã bật camera (Đang phát cho: {_currentTarget}).");
             }
             else
             {
@@ -318,7 +358,7 @@ namespace Client
                 if (_writer != null && _crypto != null)
                 {
                     byte[] encryptedStop = _crypto.EncryptAES("STOP");
-                    var packet = new Packet { Type = PacketType.VideoFrame, Sender = txtUsername.Text, Content = "STOP_VIDEO", Payload = encryptedStop };
+                    var packet = new Packet { Type = PacketType.VideoFrame, Sender = txtUsername.Text, Target = _currentTarget, Content = "STOP_VIDEO", Payload = encryptedStop };
                     await _writer.WriteLineAsync(JsonSerializer.Serialize(packet));
                 }
             }
@@ -350,7 +390,7 @@ namespace Client
                             string base64 = Convert.ToBase64String(imageBytes);
                             byte[] encrypted = _crypto.EncryptAES(base64);
 
-                            var packet = new Packet { Type = PacketType.VideoFrame, Sender = txtUsername.Text, Payload = encrypted };
+                            var packet = new Packet { Type = PacketType.VideoFrame, Sender = txtUsername.Text, Target = _currentTarget, Payload = encrypted };
                             await _writer.WriteLineAsync(JsonSerializer.Serialize(packet));
                         }
                     }
@@ -367,12 +407,13 @@ namespace Client
             try
             {
                 string message = txtMessage.Text;
-                Log($"[Tôi]: {message}");
+                string privateTag = (_currentTarget != "All") ? $" [Tới {_currentTarget}]" : "";
+                Log($"[Tôi]{privateTag}: {message}");
 
                 SaveChatHistory("Tôi", message);
 
                 byte[] encryptedMessage = _crypto.EncryptAES(message);
-                var packet = new Packet { Type = PacketType.Message, Sender = txtUsername.Text, Payload = encryptedMessage };
+                var packet = new Packet { Type = PacketType.Message, Sender = txtUsername.Text, Target = _currentTarget, Payload = encryptedMessage };
                 await _writer.WriteLineAsync(JsonSerializer.Serialize(packet));
                 txtMessage.Clear();
             }
@@ -400,12 +441,14 @@ namespace Client
                         {
                             Type = PacketType.File,
                             Sender = txtUsername.Text,
+                            Target = _currentTarget,
                             Content = fileName,
                             Payload = encryptedFile
                         };
 
                         await _writer.WriteLineAsync(JsonSerializer.Serialize(packet));
-                        Log($"[Tôi]: Đã gửi file {fileName}");
+                        string privateTag = (_currentTarget != "All") ? $" [Tới {_currentTarget}]" : "";
+                        Log($"[Tôi]{privateTag}: Đã gửi file {fileName}");
                     }
                     catch (Exception ex) { Log($"Lỗi khi gửi file: {ex.Message}"); }
                 }
